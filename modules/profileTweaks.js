@@ -53,7 +53,8 @@ async function fetchProfileSummary() {
 
 function getCurrentPreferences(summary) {
     const data = summary || {};
-    const title = String(data.title?.itemId ?? (typeof data.title === 'string' ? data.title : (data.title?.itemId ?? '10100006')));
+    let title = String(data.title?.itemId ?? (typeof data.title === 'string' ? data.title : (data.title?.itemId ?? '10100006')));
+    if (title === '-1') title = '';
     const bannerAccent = data.bannerAccent ?? data.bannerId ?? '24';
     const crestBorder = data.crestBorder ?? data.crestId ?? '1';
     const prestigeCrestBorderLevel = data.prestigeCrestBorderLevel ?? 350;
@@ -122,7 +123,8 @@ async function removeBorder(statusMessageElement) {
     try {
         await Utils.LCU.put('/lol-regalia/v2/current-summoner/regalia', {
             preferredCrestType: 'prestige',
-            preferredBannerType: 'blank'
+            preferredBannerType: 'blank',
+			selectedPrestigeCrest: 22,
         });
         flashMessage(statusMessageElement, 'Border removed!', '#4caf82');
     } catch (err) {
