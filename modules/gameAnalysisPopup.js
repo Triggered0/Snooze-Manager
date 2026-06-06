@@ -173,6 +173,7 @@ async function computePremadeGroups(teamPlayers) {
 let currentChampSelectSessionId = null;
 let champSelectPremadeMap = new Map();
 let computingPremades = null;
+let lobbyGeneration = 0; // incremented each time we enter/exit ChampSelect
 
 async function getChampSelectPremades(session) {
     const teamHash = session?.myTeam?.map(p => p.puuid || p.summonerId).join(',');
@@ -412,9 +413,21 @@ function cleanupAnalysisPanel() {
 
 let previousPhase = null;
 
+function clearLobbyCache() {
+    champSelectStatsCache.clear();
+    currentChampSelectSessionId = null;
+    champSelectPremadeMap = new Map();
+    computingPremades = null;
+    lobbyGeneration++;
+    Utils.Debug.log(`[GameAnalysis] Lobby cache cleared. lobbyGeneration=${lobbyGeneration}`);
+}
+
 function handleGameAnalysisPhase(phase) {
-    if (previousPhase === 'ChampSelect' && phase !== 'ChampSelect') {
-        champSelectStatsCache.clear();
+    // Clear all lobby-scoped state whenever we enter OR leave ChampSelect
+    const wasInChampSelect = previousPhase === 'ChampSelect';
+    const isNowChampSelect = phase === 'ChampSelect';
+    if (wasInChampSelect !== isNowChampSelect) {
+        clearLobbyCache();
     }
     previousPhase = phase;
 
@@ -876,13 +889,36 @@ function renderStatsElements(el, statsData, premadeColor) {
                     const trackingKey = `${idInfo.type}_${idInfo.value}`;
                     const hasStats = el.querySelector('.pm-champ-select-stats-top') !== null;
 
-                    // If stats are already active and correct, skip loading logic
-                    if (this._renderedIdKey === trackingKey && hasStats) {
+                    // Capture the current lobby generation at render time so we can detect
+                    // stale component instances that survived a lobby/phase transition.
+                    const myGeneration = lobbyGeneration;
+                    const generationChanged = this._renderedGeneration !== myGeneration;
+
+                    // If the component was carried over from a previous lobby, wipe its
+                    // cached state so we never re-display another player's stats.
+                    if (generationChanged) {
+                        Utils.Debug.log(`[GameAnalysis] lobbyGeneration changed (${this._renderedGeneration} → ${myGeneration}). Discarding stale component state for ${trackingKey}.`);
+                        this._renderedIdKey = null;
+                        this._renderedStats = null;
+                        this._renderedPremadeColor = null;
+                        this._isLoadingStats = false;
+                        this._loadingForId = null;
+                        // Remove any stale DOM stat elements from the previous lobby
+                        const staleTop = el.querySelector('.pm-champ-select-stats-top');
+                        const staleBot = el.querySelector('.pm-champ-select-stats-bottom');
+                        if (staleTop) staleTop.remove();
+                        if (staleBot) staleBot.remove();
+                    }
+
+                    const hasStatsNow = el.querySelector('.pm-champ-select-stats-top') !== null;
+
+                    // If stats are already active and correct for this lobby, skip loading logic
+                    if (this._renderedIdKey === trackingKey && hasStatsNow) {
                         return;
                     }
 
                     // Re-render immediately from cache if DOM structures were cleared but the player remains the same
-                    if (this._renderedIdKey === trackingKey && !hasStats && this._renderedStats) {
+                    if (this._renderedIdKey === trackingKey && !hasStatsNow && this._renderedStats) {
                         Utils.Debug.log(`[GameAnalysis] DOM wiped but trackingKey matches active player (${trackingKey}). Restoring layout.`);
                         renderStatsElements(el, this._renderedStats, this._renderedPremadeColor);
                         return;
@@ -1042,6 +1078,7 @@ function renderStatsElements(el, statsData, premadeColor) {
                             renderStatsElements(el, statsData, premadeColor);
                             this._renderedIdKey = trackingKey;
                             this._renderedStats = statsData;
+                            this._renderedGeneration = myGeneration;
 
                         } catch (err) {
                             Utils.Debug.error('[GameAnalysis] Exception caught in statistics calculation loop:', err);
@@ -1066,6 +1103,7 @@ function renderStatsElements(el, statsData, premadeColor) {
                     this._renderedIdKey = null;
                     this._renderedStats = null;
                     this._renderedPremadeColor = null;
+                    this._renderedGeneration = null;
                     this._isLoadingStats = false;
                     this._loadingForId = null;
                     this._super(...arguments);
