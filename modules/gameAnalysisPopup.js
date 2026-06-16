@@ -544,30 +544,26 @@ export function init(context) {
     Utils.Hooks.Ember.registerRule({
         name: 'game-analysis-lobby-member',
         matcher: 'lobby-member',
-        mixin() {
-            return {
-                /* 
-				Swapped to didInsertElement instead, keeping this comment for keeps sake!
-				didRender() { 
-				*/
-                didInsertElement() {
-                    this._super(...arguments);
-                    if (!Utils.Store.get('gameAnalysisPopup', 'enabled')) return;
-                    if (!this.element) return;
+        hookMethods: [{
+            name: 'didInsertElement',
+            callback(Ember, original, ...args) {
+                original(...args);
+                if (!Utils.Store.get('gameAnalysisPopup', 'enabled')) return;
+                if (!this.element) return;
+                
+                if (!this.element.querySelector('.pm-view-history-btn')) {
+                    const el = this.element;
+                    const btn = document.createElement('div');
+                    btn.className = 'pm-view-history-btn';
+                    btn.textContent = 'View History';
+                    btn.style.cssText = 'position:absolute; bottom:5px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.8); color:#0ac8b9; border:1px solid #0ac8b9; padding:2px 6px; font-size:10px; cursor:pointer; border-radius:4px; z-index:99; display:none; transition:opacity 0.2s;';
                     
-                    if (!this.element.querySelector('.pm-view-history-btn')) {
-                        const el = this.element;
-                        const btn = document.createElement('div');
-                        btn.className = 'pm-view-history-btn';
-                        btn.textContent = 'View History';
-                        btn.style.cssText = 'position:absolute; bottom:5px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.8); color:#0ac8b9; border:1px solid #0ac8b9; padding:2px 6px; font-size:10px; cursor:pointer; border-radius:4px; z-index:99; display:none; transition:opacity 0.2s;';
-                        
-                        el.addEventListener('mouseenter', () => {
-                            if (Utils.Store.get('gameAnalysisPopup', 'enabled')) {
-                                btn.style.display = 'block';
-                                setTimeout(() => btn.style.opacity = '1', 0);
-                            }
-                        });
+                    el.addEventListener('mouseenter', () => {
+                        if (Utils.Store.get('gameAnalysisPopup', 'enabled')) {
+                            btn.style.display = 'block';
+                            setTimeout(() => btn.style.opacity = '1', 0);
+                        }
+                    });
                         el.addEventListener('mouseleave', () => {
                             btn.style.opacity = '0';
                             btn.style.display = 'none';
@@ -596,16 +592,17 @@ export function init(context) {
                         el.style.position = 'relative';
                         el.appendChild(btn);
                     }
-                },
-                willDestroyElement() {
-                    if (this.element) {
-                        const btn = this.element.querySelector('.pm-view-history-btn');
-                        if (btn) btn.remove();
-                    }
-                    this._super(...arguments);
+            }
+        }, {
+            name: 'willDestroyElement',
+            callback(Ember, original, ...args) {
+                if (this.element) {
+                    const btn = this.element.querySelector('.pm-view-history-btn');
+                    if (btn) btn.remove();
                 }
-            };
-        }
+                original(...args);
+            }
+        }]
     });
 
 let _cachedCsSessionPromise = null;
@@ -754,367 +751,368 @@ function renderStatsElements(el, statsData, premadeColor) {
     Utils.Hooks.Ember.registerRule({
         name: 'game-analysis-summoner-object',
         matcher: 'summoner-object',
-        mixin() {
-            return {
-                didRender() {
-                    this._super(...arguments);
-                    if (!this.element) {
-                        Utils.Debug.warn('[GameAnalysis] didRender triggered but DOM element is missing.');
-                        return;
-                    }
-                    
-                    const el = this.element;
+        hookMethods: [{
+            name: 'didRender',
+            callback(Ember, original, ...args) {
+                original(...args);
+                if (!this.element) {
+                    Utils.Debug.warn('[GameAnalysis] didRender triggered but DOM element is missing.');
+                    return;
+                }
+                
+                const el = this.element;
 
-                    // Helper to dynamically extract the unique identifier from the active Ember component context
-                    const getPlayerId = () => {
-                        const paths = [
-                            'summonerId', 'summoner.summonerId', 'member.summonerId',
-                            'cellId', 'summoner.cellId', 'member.cellId',
-                            'puuid', 'summoner.puuid', 'member.puuid'
-                        ];
-                        for (const path of paths) {
-                            try {
-                                const val = this.get ? this.get(path) : path.split('.').reduce((acc, part) => acc?.[part], this);
-                                // Filter out unassigned default states (0, -1, empty strings)
-                                if (
-                                    val !== undefined && 
-                                    val !== null && 
-                                    val !== 0 && 
-                                    val !== '0' && 
-                                    val !== -1 && 
-                                    val !== '-1' && 
-                                    val !== ''
-                                ) {
-                                    if (path.includes('summonerId')) return { type: 'summonerId', value: val };
-                                    if (path.includes('cellId')) return { type: 'cellId', value: val };
-                                    if (path.includes('puuid')) return { type: 'puuid', value: val };
-                                }
-                            } catch (e) {}
-                        }
-                        return null;
-                    };
-
-                    const idInfo = getPlayerId();
-                    if (!idInfo) {
-                        Utils.Debug.log('[GameAnalysis] Player component not fully initialized yet (id returned null/empty). Skipping render.');
-                        return;
-                    }
-
-                    Utils.Debug.log(`[GameAnalysis] didRender resolved dynamic identifier: ${idInfo.type} = ${idInfo.value}`);
-
-                    // 1. History Modal Click Trigger
-                    const icon = el.querySelector('.champion-icon-container');
-                    if (icon && !icon.hasAttribute('data-pm-history')) {
-                        icon.setAttribute('data-pm-history', 'true');
-                        Utils.Debug.log('[GameAnalysis] Setting up history modal click trigger listener on icon element');
-                        
-                        const updateCursor = () => {
-                            icon.style.cursor = Utils.Store.get('gameAnalysisPopup', 'enabled') ? 'pointer' : 'default';
-                        };
-                        updateCursor();
-                        icon.addEventListener('mouseenter', updateCursor);
-                        
-                        icon.addEventListener('click', async (e) => {
-                            if (!Utils.Store.get('gameAnalysisPopup', 'enabled')) return;
-                            if (e.target.closest('.swap-button-component, .summoner-muted-icon')) return;
-                            e.preventDefault(); e.stopPropagation();
-                            
-                            // Dynamically evaluate player ID at the moment of the click
-                            const activeIdInfo = getPlayerId();
-                            if (!activeIdInfo) {
-                                Utils.Debug.warn('[GameAnalysis] Click event fired but dynamic player ID resolution returned null.');
-                                return;
-                            }
-                            
-                            try {
-                                Utils.Debug.log(`[GameAnalysis] History click dynamically resolved: ${activeIdInfo.type} = ${activeIdInfo.value}`);
-                                const session = await getCachedCsSession();
-                                if (!session) {
-                                    Utils.Debug.error('[GameAnalysis] Failed to resolve active Champ Select session during click dispatch.');
-                                    return;
-                                }
-
-                                const player = session.myTeam.find(m => {
-                                    if (activeIdInfo.type === 'summonerId') return m.summonerId === activeIdInfo.value;
-                                    if (activeIdInfo.type === 'cellId') return m.cellId === activeIdInfo.value;
-                                    if (activeIdInfo.type === 'puuid') return m.puuid === activeIdInfo.value;
-                                    return false;
-                                });
-
-                                if (player) {
-                                    Utils.Debug.log(`[GameAnalysis] Match found in session: ${player.gameName || 'Anonymous'}#${player.tagLine || '????'}`);
-                                    let queueId = null;
-                                    try {
-                                        const gf = await getCachedGfSession();
-                                        queueId = gf?.gameData?.queue?.id;
-                                    } catch(e) { Utils.Debug.error('[GameAnalysis] Failed to fetch queue ID tag for match history modal', e); }
-                                    const tag = queueId ? 'q_' + queueId : '';
-                                    
-                                    let lookupPlayer = null;
-                                    if (player.puuid) {
-                                        Utils.Debug.log(`[GameAnalysis] Querying details for PUUID: ${player.puuid}`);
-                                        lookupPlayer = await Utils.LCU.get('/lol-summoner/v2/summoners/puuid/' + player.puuid).catch((err) => {
-                                            Utils.Debug.error('[GameAnalysis] LCU PUUID query failed:', err);
-                                            return null;
-                                        });
-                                    }
-                                    if (!lookupPlayer && player.summonerId) {
-                                        Utils.Debug.log(`[GameAnalysis] Fallback: querying details for summonerId: ${player.summonerId}`);
-                                        lookupPlayer = await Utils.LCU.get('/lol-summoner/v1/summoners/' + player.summonerId).catch((err) => {
-                                            Utils.Debug.error('[GameAnalysis] LCU summonerId query failed:', err);
-                                            return null;
-                                        });
-                                    }
-                                    if (lookupPlayer) {
-                                        Utils.Debug.log(`[GameAnalysis] Dispatching history modal for ${lookupPlayer.displayName || lookupPlayer.gameName}`);
-                                        MatchHistoryModal.show(lookupPlayer, tag);
-                                    } else {
-                                        Utils.Debug.warn('[GameAnalysis] Target profile details returned null.');
-                                    }
-                                } else {
-                                    Utils.Debug.warn(`[GameAnalysis] Target not found in session matching ${activeIdInfo.type}_${activeIdInfo.value}`);
-                                }
-                            } catch(err) {
-                                Utils.Debug.error('[GameAnalysis] Exception caught inside dynamic click handler:', err);
-                            }
-                        });
-                    }
-
-                    // 2. Inline Champ Select Stats
-                    if (!isChampSelectStatsEnabled) {
-                        const existingTop = el.querySelector('.pm-champ-select-stats-top');
-                        const existingBot = el.querySelector('.pm-champ-select-stats-bottom');
-                        if (existingTop) existingTop.remove();
-                        if (existingBot) existingBot.remove();
-                        this._renderedIdKey = null;
-                        this._renderedStats = null;
-                        return;
-                    }
-
-                    const trackingKey = `${idInfo.type}_${idInfo.value}`;
-                    const hasStats = el.querySelector('.pm-champ-select-stats-top') !== null;
-
-                    // Capture the current lobby generation at render time so we can detect
-                    // stale component instances that survived a lobby/phase transition.
-                    const myGeneration = lobbyGeneration;
-                    const generationChanged = this._renderedGeneration !== myGeneration;
-
-                    // If the component was carried over from a previous lobby, wipe its
-                    // cached state so we never re-display another player's stats.
-                    if (generationChanged) {
-                        Utils.Debug.log(`[GameAnalysis] lobbyGeneration changed (${this._renderedGeneration} → ${myGeneration}). Discarding stale component state for ${trackingKey}.`);
-                        this._renderedIdKey = null;
-                        this._renderedStats = null;
-                        this._renderedPremadeColor = null;
-                        this._isLoadingStats = false;
-                        this._loadingForId = null;
-                        // Remove any stale DOM stat elements from the previous lobby
-                        const staleTop = el.querySelector('.pm-champ-select-stats-top');
-                        const staleBot = el.querySelector('.pm-champ-select-stats-bottom');
-                        if (staleTop) staleTop.remove();
-                        if (staleBot) staleBot.remove();
-                    }
-
-                    const hasStatsNow = el.querySelector('.pm-champ-select-stats-top') !== null;
-
-                    // If stats are already active and correct for this lobby, skip loading logic
-                    if (this._renderedIdKey === trackingKey && hasStatsNow) {
-                        return;
-                    }
-
-                    // Re-render immediately from cache if DOM structures were cleared but the player remains the same
-                    if (this._renderedIdKey === trackingKey && !hasStatsNow && this._renderedStats) {
-                        Utils.Debug.log(`[GameAnalysis] DOM wiped but trackingKey matches active player (${trackingKey}). Restoring layout.`);
-                        renderStatsElements(el, this._renderedStats, this._renderedPremadeColor);
-                        return;
-                    }
-
-                    // Block concurrent loadings for the same player instance
-                    if (this._isLoadingStats && this._loadingForId === trackingKey) {
-                        Utils.Debug.log(`[GameAnalysis] Load call blocked. Already fetching stats for: ${trackingKey}`);
-                        return;
-                    }
-
-                    this._isLoadingStats = true;
-                    this._loadingForId = trackingKey;
-
-                    Utils.Debug.log(`[GameAnalysis] Queuing inline statistics render task for player: ${trackingKey}`);
-
-                    setTimeout(async () => {
+                // Helper to dynamically extract the unique identifier from the active Ember component context
+                const getPlayerId = () => {
+                    const paths = [
+                        'summonerId', 'summoner.summonerId', 'member.summonerId',
+                        'cellId', 'summoner.cellId', 'member.cellId',
+                        'puuid', 'summoner.puuid', 'member.puuid'
+                    ];
+                    for (const path of paths) {
                         try {
-                            const currentIdInfo = getPlayerId();
-                            const currentKey = currentIdInfo ? `${currentIdInfo.type}_${currentIdInfo.value}` : null;
-                            if (currentKey !== trackingKey) {
-                                Utils.Debug.warn(`[GameAnalysis] Swapped trackingKey context from ${trackingKey} to ${currentKey} during buffer delay. Aborting draw.`);
-                                return;
+                            const val = this.get ? this.get(path) : path.split('.').reduce((acc, part) => acc?.[part], this);
+                            // Filter out unassigned default states (0, -1, empty strings)
+                            if (
+                                val !== undefined && 
+                                val !== null && 
+                                val !== 0 && 
+                                val !== '0' && 
+                                val !== -1 && 
+                                val !== '-1' && 
+                                val !== ''
+                            ) {
+                                if (path.includes('summonerId')) return { type: 'summonerId', value: val };
+                                if (path.includes('cellId')) return { type: 'cellId', value: val };
+                                if (path.includes('puuid')) return { type: 'puuid', value: val };
                             }
+                        } catch (e) {}
+                    }
+                    return null;
+                };
 
-                            Utils.Debug.log(`[GameAnalysis] Pulling active Champ Select session for ${trackingKey}`);
+                const idInfo = getPlayerId();
+                if (!idInfo) {
+                    Utils.Debug.log('[GameAnalysis] Player component not fully initialized yet (id returned null/empty). Skipping render.');
+                    return;
+                }
+
+                Utils.Debug.log(`[GameAnalysis] didRender resolved dynamic identifier: ${idInfo.type} = ${idInfo.value}`);
+
+                // 1. History Modal Click Trigger
+                const icon = el.querySelector('.champion-icon-container');
+                if (icon && !icon.hasAttribute('data-pm-history')) {
+                    icon.setAttribute('data-pm-history', 'true');
+                    Utils.Debug.log('[GameAnalysis] Setting up history modal click trigger listener on icon element');
+                    
+                    const updateCursor = () => {
+                        icon.style.cursor = Utils.Store.get('gameAnalysisPopup', 'enabled') ? 'pointer' : 'default';
+                    };
+                    updateCursor();
+                    icon.addEventListener('mouseenter', updateCursor);
+                    
+                    icon.addEventListener('click', async (e) => {
+                        if (!Utils.Store.get('gameAnalysisPopup', 'enabled')) return;
+                        if (e.target.closest('.swap-button-component, .summoner-muted-icon')) return;
+                        e.preventDefault(); e.stopPropagation();
+                        
+                        // Dynamically evaluate player ID at the moment of the click
+                        const activeIdInfo = getPlayerId();
+                        if (!activeIdInfo) {
+                            Utils.Debug.warn('[GameAnalysis] Click event fired but dynamic player ID resolution returned null.');
+                            return;
+                        }
+                        
+                        try {
+                            Utils.Debug.log(`[GameAnalysis] History click dynamically resolved: ${activeIdInfo.type} = ${activeIdInfo.value}`);
                             const session = await getCachedCsSession();
                             if (!session) {
-                                Utils.Debug.warn('[GameAnalysis] Failed to resolve current Champ Select LCU session.');
+                                Utils.Debug.error('[GameAnalysis] Failed to resolve active Champ Select session during click dispatch.');
                                 return;
                             }
 
-                            Utils.Debug.log(`[GameAnalysis] Finding player matching ${trackingKey} inside team lists...`);
                             const player = session.myTeam.find(m => {
-                                if (idInfo.type === 'summonerId') return m.summonerId === idInfo.value;
-                                if (idInfo.type === 'cellId') return m.cellId === idInfo.value;
-                                if (idInfo.type === 'puuid') return m.puuid === idInfo.value;
+                                if (activeIdInfo.type === 'summonerId') return m.summonerId === activeIdInfo.value;
+                                if (activeIdInfo.type === 'cellId') return m.cellId === activeIdInfo.value;
+                                if (activeIdInfo.type === 'puuid') return m.puuid === activeIdInfo.value;
                                 return false;
                             });
 
-                            if (!player) {
-                                Utils.Debug.warn(`[GameAnalysis] Matching player not found in team array for mapping key: ${trackingKey}`);
-                                return;
-                            }
-
-                            Utils.Debug.log(`[GameAnalysis] Target identified as: ${player.gameName || 'Anonymous'}#${player.tagLine || '????'}`);
-
-                            let puuid = player.puuid;
-                            if (!puuid && player.summonerId) {
-                                Utils.Debug.log(`[GameAnalysis] PUUID is empty on session object. Resolving summoner details for summonerId: ${player.summonerId}`);
-                                const p = await Utils.LCU.get('/lol-summoner/v1/summoners/' + player.summonerId).catch(() => null);
-                                if (p) puuid = p.puuid;
-                            }
-                            if (!puuid) {
-                                Utils.Debug.warn('[GameAnalysis] Could not locate valid PUUID for stats loading.');
-                                return;
-                            }
-
-                            Utils.Debug.log(`[GameAnalysis] Target resolved PUUID: ${puuid}`);
-
-                            // Resolve premades if enabled
-                            const premades = isPremadeHighlightEnabled ? await getChampSelectPremades(session) : new Map();
-                            const premadeColor = premades.get(puuid);
-                            if (premadeColor) {
-                                Utils.Debug.log(`[GameAnalysis] Player ${puuid} belongs to a premade group. Applying visual indicator color: ${premadeColor}`);
-                                this._renderedPremadeColor = premadeColor;
-                            } else {
-                                this._renderedPremadeColor = null;
-                            }
-
-                            const gf = await getCachedGfSession();
-                            const queueId = gf?.gameData?.queue?.id;
-                            const tag = queueId ? 'q_' + queueId : '';
-                            const cacheKey = `${puuid}_${tag}`;
-
-                            Utils.Debug.log(`[GameAnalysis] Checking local inline stats cache with key: ${cacheKey}`);
-                            let statsData = champSelectStatsCache.get(cacheKey);
-
-                            if (!statsData) {
-                                Utils.Debug.log(`[GameAnalysis] Cache MISS. Fetching match history and ranked stats for PUUID: ${puuid}`);
-                                const [h, ranked] = await Promise.all([
-                                    Utils.GameData.getSgpMatchHistory(puuid, 0, 20, tag).catch((err) => {
-                                        Utils.Debug.error('[GameAnalysis] Match History API fetch failed', err);
+                            if (player) {
+                                Utils.Debug.log(`[GameAnalysis] Match found in session: ${player.gameName || 'Anonymous'}#${player.tagLine || '????'}`);
+                                let queueId = null;
+                                try {
+                                    const gf = await getCachedGfSession();
+                                    queueId = gf?.gameData?.queue?.id;
+                                } catch(e) { Utils.Debug.error('[GameAnalysis] Failed to fetch queue ID tag for match history modal', e); }
+                                const tag = queueId ? 'q_' + queueId : '';
+                                
+                                let lookupPlayer = null;
+                                if (player.puuid) {
+                                    Utils.Debug.log(`[GameAnalysis] Querying details for PUUID: ${player.puuid}`);
+                                    lookupPlayer = await Utils.LCU.get('/lol-summoner/v2/summoners/puuid/' + player.puuid).catch((err) => {
+                                        Utils.Debug.error('[GameAnalysis] LCU PUUID query failed:', err);
                                         return null;
-                                    }),
-                                    Utils.LCU.get('/lol-ranked/v1/ranked-stats/' + puuid).catch((err) => {
-                                        Utils.Debug.error('[GameAnalysis] LCU Ranked Stats API fetch failed', err);
-                                        return null;
-                                    })
-                                ]);
-
-                                let rankText = null;
-                                let rankTier = null;
-                                if (ranked?.queueMap?.RANKED_SOLO_5x5) {
-                                    const q = ranked.queueMap.RANKED_SOLO_5x5;
-                                    if (q.tier && q.tier !== 'NONE' && q.tier !== 'UNRANKED') {
-                                        rankTier = q.tier;
-                                        rankText = q.tier + (q.division && q.division !== 'NA' ? ' ' + q.division : '');
-                                    }
-                                }
-                                Utils.Debug.log(`[GameAnalysis] Resolved ranked stats: Tier = ${rankTier} | Text = ${rankText}`);
-
-                                if (h && h.games && h.games.length > 0) {
-                                    Utils.Debug.log(`[GameAnalysis] Retrieved ${h.games.length} match records. Compiling stats averages...`);
-                                    let totalK = 0, totalD = 0, totalA = 0, totalW = 0, validG = 0;
-                                    const champCounts = {};
-                                    const results = [];
-
-                                    h.games.forEach(g => {
-                                        const pt = g.json.participants.find(x => x.puuid === puuid) || g.json.participants[0];
-                                        const isWin = pt.win !== undefined ? pt.win : g.json.teams.find(t => t.teamId === pt.teamId)?.win;
-                                        const isRemake = g.json.gameDuration < 240 && g.json.gameMode !== 'PRACTICETOOL'; 
-                                        
-                                        if (!isRemake) {
-                                            totalK += (pt.kills || 0);
-                                            totalD += (pt.deaths || 0);
-                                            totalA += (pt.assists || 0);
-                                            if (isWin) totalW++;
-                                            validG++;
-                                            
-                                            if (pt.championId) {
-                                                champCounts[pt.championId] = (champCounts[pt.championId] || 0) + 1;
-                                            }
-                                        }
-
-                                        results.push(isRemake ? 'remake' : (isWin ? 'win' : 'loss'));
                                     });
-
-                                    let mostPickedId = null;
-                                    let mostPickedCount = 0;
-                                    for (const [cid, count] of Object.entries(champCounts)) {
-                                        if (count > mostPickedCount) {
-                                            mostPickedCount = count;
-                                            mostPickedId = cid;
-                                        }
-                                    }
-
-                                    const kda = validG > 0 ? ((totalK + totalA) / Math.max(1, totalD)).toFixed(2) : '?';
-                                    const wr = validG > 0 ? Math.round((totalW / validG) * 100) : '?';
-
-                                    statsData = { 
-                                        results: results.slice(0, 10),
-                                        kda, wr, mostPickedId, mostPickedCount, validG, rankText, rankTier
-                                    };
-                                    champSelectStatsCache.set(cacheKey, statsData);
+                                }
+                                if (!lookupPlayer && player.summonerId) {
+                                    Utils.Debug.log(`[GameAnalysis] Fallback: querying details for summonerId: ${player.summonerId}`);
+                                    lookupPlayer = await Utils.LCU.get('/lol-summoner/v1/summoners/' + player.summonerId).catch((err) => {
+                                        Utils.Debug.error('[GameAnalysis] LCU summonerId query failed:', err);
+                                        return null;
+                                    });
+                                }
+                                if (lookupPlayer) {
+                                    Utils.Debug.log(`[GameAnalysis] Dispatching history modal for ${lookupPlayer.displayName || lookupPlayer.gameName}`);
+                                    MatchHistoryModal.show(lookupPlayer, tag);
                                 } else {
-                                    Utils.Debug.warn('[GameAnalysis] SGP match history array was empty or returned invalid.');
-                                    statsData = { empty: true, rankText, rankTier };
-                                    champSelectStatsCache.set(cacheKey, statsData);
+                                    Utils.Debug.warn('[GameAnalysis] Target profile details returned null.');
                                 }
                             } else {
-                                Utils.Debug.log(`[GameAnalysis] Cache HIT for player stats: ${cacheKey}`);
+                                Utils.Debug.warn(`[GameAnalysis] Target not found in session matching ${activeIdInfo.type}_${activeIdInfo.value}`);
                             }
-
-                            // Render and save to component tracking state
-                            Utils.Debug.log(`[GameAnalysis] Drawing stats interface updates for player key: ${trackingKey}`);
-                            renderStatsElements(el, statsData, premadeColor);
-                            this._renderedIdKey = trackingKey;
-                            this._renderedStats = statsData;
-                            this._renderedGeneration = myGeneration;
-
-                        } catch (err) {
-                            Utils.Debug.error('[GameAnalysis] Exception caught in statistics calculation loop:', err);
-                        } finally {
-                            this._isLoadingStats = false;
-                            this._loadingForId = null;
+                        } catch(err) {
+                            Utils.Debug.error('[GameAnalysis] Exception caught inside dynamic click handler:', err);
                         }
-                    }, 50);
-                },
-                willDestroyElement() {
-                    if (this.element) {
-                        Utils.Debug.log('[GameAnalysis] willDestroyElement triggered. Cleaning up elements.');
-                        const icon = this.element.querySelector('.champion-icon-container');
-                        if (icon) icon.removeAttribute('data-pm-history');
-                        
-                        // Clean up manually appended stats elements on destroy
-                        const top = this.element.querySelector('.pm-champ-select-stats-top');
-                        const bot = this.element.querySelector('.pm-champ-select-stats-bottom');
-                        if (top) top.remove();
-                        if (bot) bot.remove();
-                    }
+                    });
+                }
+
+                // 2. Inline Champ Select Stats
+                if (!isChampSelectStatsEnabled) {
+                    const existingTop = el.querySelector('.pm-champ-select-stats-top');
+                    const existingBot = el.querySelector('.pm-champ-select-stats-bottom');
+                    if (existingTop) existingTop.remove();
+                    if (existingBot) existingBot.remove();
+                    this._renderedIdKey = null;
+                    this._renderedStats = null;
+                    return;
+                }
+
+                const trackingKey = `${idInfo.type}_${idInfo.value}`;
+                const hasStats = el.querySelector('.pm-champ-select-stats-top') !== null;
+
+                // Capture the current lobby generation at render time so we can detect
+                // stale component instances that survived a lobby/phase transition.
+                const myGeneration = lobbyGeneration;
+                const generationChanged = this._renderedGeneration !== myGeneration;
+
+                // If the component was carried over from a previous lobby, wipe its
+                // cached state so we never re-display another player's stats.
+                if (generationChanged) {
+                    Utils.Debug.log(`[GameAnalysis] lobbyGeneration changed (${this._renderedGeneration} → ${myGeneration}). Discarding stale component state for ${trackingKey}.`);
                     this._renderedIdKey = null;
                     this._renderedStats = null;
                     this._renderedPremadeColor = null;
-                    this._renderedGeneration = null;
                     this._isLoadingStats = false;
                     this._loadingForId = null;
-                    this._super(...arguments);
+                    // Remove any stale DOM stat elements from the previous lobby
+                    const staleTop = el.querySelector('.pm-champ-select-stats-top');
+                    const staleBot = el.querySelector('.pm-champ-select-stats-bottom');
+                    if (staleTop) staleTop.remove();
+                    if (staleBot) staleBot.remove();
                 }
-            };
-        }
+
+                const hasStatsNow = el.querySelector('.pm-champ-select-stats-top') !== null;
+
+                // If stats are already active and correct for this lobby, skip loading logic
+                if (this._renderedIdKey === trackingKey && hasStatsNow) {
+                    return;
+                }
+
+                // Re-render immediately from cache if DOM structures were cleared but the player remains the same
+                if (this._renderedIdKey === trackingKey && !hasStatsNow && this._renderedStats) {
+                    Utils.Debug.log(`[GameAnalysis] DOM wiped but trackingKey matches active player (${trackingKey}). Restoring layout.`);
+                    renderStatsElements(el, this._renderedStats, this._renderedPremadeColor);
+                    return;
+                }
+
+                // Block concurrent loadings for the same player instance
+                if (this._isLoadingStats && this._loadingForId === trackingKey) {
+                    Utils.Debug.log(`[GameAnalysis] Load call blocked. Already fetching stats for: ${trackingKey}`);
+                    return;
+                }
+
+                this._isLoadingStats = true;
+                this._loadingForId = trackingKey;
+
+                Utils.Debug.log(`[GameAnalysis] Queuing inline statistics render task for player: ${trackingKey}`);
+
+                setTimeout(async () => {
+                    try {
+                        const currentIdInfo = getPlayerId();
+                        const currentKey = currentIdInfo ? `${currentIdInfo.type}_${currentIdInfo.value}` : null;
+                        if (currentKey !== trackingKey) {
+                            Utils.Debug.warn(`[GameAnalysis] Swapped trackingKey context from ${trackingKey} to ${currentKey} during buffer delay. Aborting draw.`);
+                            return;
+                        }
+
+                        Utils.Debug.log(`[GameAnalysis] Pulling active Champ Select session for ${trackingKey}`);
+                        const session = await getCachedCsSession();
+                        if (!session) {
+                            Utils.Debug.warn('[GameAnalysis] Failed to resolve current Champ Select LCU session.');
+                            return;
+                        }
+
+                        Utils.Debug.log(`[GameAnalysis] Finding player matching ${trackingKey} inside team lists...`);
+                        const player = session.myTeam.find(m => {
+                            if (idInfo.type === 'summonerId') return m.summonerId === idInfo.value;
+                            if (idInfo.type === 'cellId') return m.cellId === idInfo.value;
+                            if (idInfo.type === 'puuid') return m.puuid === idInfo.value;
+                            return false;
+                        });
+
+                        if (!player) {
+                            Utils.Debug.warn(`[GameAnalysis] Matching player not found in team array for mapping key: ${trackingKey}`);
+                            return;
+                        }
+
+                        Utils.Debug.log(`[GameAnalysis] Target identified as: ${player.gameName || 'Anonymous'}#${player.tagLine || '????'}`);
+
+                        let puuid = player.puuid;
+                        if (!puuid && player.summonerId) {
+                            Utils.Debug.log(`[GameAnalysis] PUUID is empty on session object. Resolving summoner details for summonerId: ${player.summonerId}`);
+                            const p = await Utils.LCU.get('/lol-summoner/v1/summoners/' + player.summonerId).catch(() => null);
+                            if (p) puuid = p.puuid;
+                        }
+                        if (!puuid) {
+                            Utils.Debug.warn('[GameAnalysis] Could not locate valid PUUID for stats loading.');
+                            return;
+                        }
+
+                        Utils.Debug.log(`[GameAnalysis] Target resolved PUUID: ${puuid}`);
+
+                        // Resolve premades if enabled
+                        const premades = isPremadeHighlightEnabled ? await getChampSelectPremades(session) : new Map();
+                        const premadeColor = premades.get(puuid);
+                        if (premadeColor) {
+                            Utils.Debug.log(`[GameAnalysis] Player ${puuid} belongs to a premade group. Applying visual indicator color: ${premadeColor}`);
+                            this._renderedPremadeColor = premadeColor;
+                        } else {
+                            this._renderedPremadeColor = null;
+                        }
+
+                        const gf = await getCachedGfSession();
+                        const queueId = gf?.gameData?.queue?.id;
+                        const tag = queueId ? 'q_' + queueId : '';
+                        const cacheKey = `${puuid}_${tag}`;
+
+                        Utils.Debug.log(`[GameAnalysis] Checking local inline stats cache with key: ${cacheKey}`);
+                        let statsData = champSelectStatsCache.get(cacheKey);
+
+                        if (!statsData) {
+                            Utils.Debug.log(`[GameAnalysis] Cache MISS. Fetching match history and ranked stats for PUUID: ${puuid}`);
+                            const [h, ranked] = await Promise.all([
+                                Utils.GameData.getSgpMatchHistory(puuid, 0, 20, tag).catch((err) => {
+                                    Utils.Debug.error('[GameAnalysis] Match History API fetch failed', err);
+                                    return null;
+                                }),
+                                Utils.LCU.get('/lol-ranked/v1/ranked-stats/' + puuid).catch((err) => {
+                                    Utils.Debug.error('[GameAnalysis] LCU Ranked Stats API fetch failed', err);
+                                    return null;
+                                })
+                            ]);
+
+                            let rankText = null;
+                            let rankTier = null;
+                            if (ranked?.queueMap?.RANKED_SOLO_5x5) {
+                                const q = ranked.queueMap.RANKED_SOLO_5x5;
+                                if (q.tier && q.tier !== 'NONE' && q.tier !== 'UNRANKED') {
+                                    rankTier = q.tier;
+                                    rankText = q.tier + (q.division && q.division !== 'NA' ? ' ' + q.division : '');
+                                }
+                            }
+                            Utils.Debug.log(`[GameAnalysis] Resolved ranked stats: Tier = ${rankTier} | Text = ${rankText}`);
+
+                            if (h && h.games && h.games.length > 0) {
+                                Utils.Debug.log(`[GameAnalysis] Retrieved ${h.games.length} match records. Compiling stats averages...`);
+                                let totalK = 0, totalD = 0, totalA = 0, totalW = 0, validG = 0;
+                                const champCounts = {};
+                                const results = [];
+
+                                h.games.forEach(g => {
+                                    const pt = g.json.participants.find(x => x.puuid === puuid) || g.json.participants[0];
+                                    const isWin = pt.win !== undefined ? pt.win : g.json.teams.find(t => t.teamId === pt.teamId)?.win;
+                                    const isRemake = g.json.gameDuration < 240 && g.json.gameMode !== 'PRACTICETOOL'; 
+                                    
+                                    if (!isRemake) {
+                                        totalK += (pt.kills || 0);
+                                        totalD += (pt.deaths || 0);
+                                        totalA += (pt.assists || 0);
+                                        if (isWin) totalW++;
+                                        validG++;
+                                        
+                                        if (pt.championId) {
+                                            champCounts[pt.championId] = (champCounts[pt.championId] || 0) + 1;
+                                        }
+                                    }
+
+                                    results.push(isRemake ? 'remake' : (isWin ? 'win' : 'loss'));
+                                });
+
+                                let mostPickedId = null;
+                                let mostPickedCount = 0;
+                                for (const [cid, count] of Object.entries(champCounts)) {
+                                    if (count > mostPickedCount) {
+                                        mostPickedCount = count;
+                                        mostPickedId = cid;
+                                    }
+                                }
+
+                                const kda = validG > 0 ? ((totalK + totalA) / Math.max(1, totalD)).toFixed(2) : '?';
+                                const wr = validG > 0 ? Math.round((totalW / validG) * 100) : '?';
+
+                                statsData = { 
+                                    results: results.slice(0, 10),
+                                    kda, wr, mostPickedId, mostPickedCount, validG, rankText, rankTier
+                                };
+                                champSelectStatsCache.set(cacheKey, statsData);
+                            } else {
+                                Utils.Debug.warn('[GameAnalysis] SGP match history array was empty or returned invalid.');
+                                statsData = { empty: true, rankText, rankTier };
+                                champSelectStatsCache.set(cacheKey, statsData);
+                            }
+                        } else {
+                            Utils.Debug.log(`[GameAnalysis] Cache HIT for player stats: ${cacheKey}`);
+                        }
+
+                        // Render and save to component tracking state
+                        Utils.Debug.log(`[GameAnalysis] Drawing stats interface updates for player key: ${trackingKey}`);
+                        renderStatsElements(el, statsData, premadeColor);
+                        this._renderedIdKey = trackingKey;
+                        this._renderedStats = statsData;
+                        this._renderedGeneration = myGeneration;
+
+                    } catch (err) {
+                        Utils.Debug.error('[GameAnalysis] Exception caught in statistics calculation loop:', err);
+                    } finally {
+                        this._isLoadingStats = false;
+                        this._loadingForId = null;
+                    }
+                }, 50);
+            }
+        }, {
+            name: 'willDestroyElement',
+            callback(Ember, original, ...args) {
+                if (this.element) {
+                    Utils.Debug.log('[GameAnalysis] willDestroyElement triggered. Cleaning up elements.');
+                    const icon = this.element.querySelector('.champion-icon-container');
+                    if (icon) icon.removeAttribute('data-pm-history');
+                    
+                    // Clean up manually appended stats elements on destroy
+                    const top = this.element.querySelector('.pm-champ-select-stats-top');
+                    const bot = this.element.querySelector('.pm-champ-select-stats-bottom');
+                    if (top) top.remove();
+                    if (bot) bot.remove();
+                }
+                this._renderedIdKey = null;
+                this._renderedStats = null;
+                this._renderedPremadeColor = null;
+                this._renderedGeneration = null;
+                this._isLoadingStats = false;
+                this._loadingForId = null;
+                original(...args);
+            }
+        }]
     });
 }
 

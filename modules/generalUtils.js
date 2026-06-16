@@ -296,6 +296,29 @@ const EmberHook = window.__SM_EmberHook || (window.__SM_EmberHook = {
       }
     }
 
+    const hookList = rule.hookMethods || (rule.hookMethod ? [rule.hookMethod] : []);
+    if (hookList.length) {
+      try {
+        const proto = cur.proto();
+        const applied = (proto[this._appliedRulesKey] ??= new Set());
+        if (!applied.has(rule.name)) {
+          for (const hm of hookList) {
+            const original = proto[hm.name];
+            proto[hm.name] = function(...args) {
+              const proxyOriginal = (...callArgs) => {
+                if (typeof original === 'function') return original.apply(this, callArgs);
+              };
+              return hm.callback.call(this, Ember, proxyOriginal, ...args);
+            };
+          }
+          applied.add(rule.name);
+          proto[this._appliedRulesKey] = applied;
+        }
+      } catch (e) {
+        Debug.warn('[EmberHook] hookMethods failed:', rule.name, e);
+      }
+    }
+
     return cur;
   },
 
@@ -409,6 +432,10 @@ const EmberHook = window.__SM_EmberHook || (window.__SM_EmberHook = {
     } else {
       this._rules.push(rule);
     }
+    return () => {
+      const idx = this._rules.indexOf(rule);
+      if (idx >= 0) this._rules.splice(idx, 1);
+    };
   },
 
   getRulesCount() {

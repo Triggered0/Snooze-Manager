@@ -1322,30 +1322,43 @@ export function installEmberHook() {
     Utils.Hooks.Ember.registerRule({
         name: 'social-panel-tweaks-roster-member',
         matcher: 'lol-social-roster-member',
-        mixin() {
-            return {
-                /*
-				// Commented out since these seems redundent. keeping for keeps sake
-                didInsertElement() {
-                    this._super(...arguments);
+        hookMethods: [
+            /*
+            // Commented out since these seems redundent. keeping for keeps sake
+            {
+                name: 'didInsertElement',
+                callback(Ember, original, ...args) {
+                    original(...args);
                     refreshRosterMemberElement(this.element);
-                },
-                didUpdate() {
-                    this._super(...arguments);
+                }
+            },
+            {
+                name: 'didUpdate',
+                callback(Ember, original, ...args) {
+                    original(...args);
                     refreshRosterMemberElement(this.element);
-                },
-                */
-                didInsertElement() {
-                    this._super(...arguments);
+                }
+            },
+            */
+            {
+                name: 'didInsertElement',
+                callback(Ember, original, ...args) {
+                    original(...args);
                     if (this.element) this.element.dataset.snoozeFriendName = this.get('gameName') || '';
                     refreshRosterMemberElement(this.element);
-                },
-                didRender() {
-                    this._super(...arguments);
+                }
+            },
+            {
+                name: 'didRender',
+                callback(Ember, original, ...args) {
+                    original(...args);
                     if (this.element) this.element.dataset.snoozeFriendName = this.get('gameName') || '';
                     refreshRosterMemberElement(this.element);
-                },
-                willDestroyElement() {
+                }
+            },
+            {
+                name: 'willDestroyElement',
+                callback(Ember, original, ...args) {
                     const element = this.element;
                     if (element) {
                         const member = resolveRosterMember(element);
@@ -1355,75 +1368,74 @@ export function installEmberHook() {
                         }
                         element.querySelectorAll?.(`[${ACTIVE_ATTR}]`).forEach(restoreStatusLine);
                     }
-                    this._super(...arguments);
-                },
-            };
-        },
+                    original(...args);
+                }
+            }
+        ]
     });
     Utils.Hooks.Ember.registerRule({
         name: 'social-panel-tweaks-roster-group',
         matcher: 'lol-social-roster-group',
-        mixin() {
-            return {
-                contextMenu(event) {
-                    if (isFolderInviteEnabled) {
-                        const group = this.get ? this.get('group') : this.group;
-                        const isMetaGroup = group?.isMetaGroup || (this.element && this.element.querySelector('.group.meta'));
-                        
-                        if (currentGameflowPhase === 'Lobby' && !isMetaGroup) {
-                            const tryInject = () => {
-                                const menuEl = document.querySelector('lol-uikit-context-menu');
-                                if (!menuEl) {
-                                    requestAnimationFrame(tryInject);
-                                    return;
+        hookMethods: [{
+            name: 'contextMenu',
+            callback(Ember, original, ...args) {
+                if (isFolderInviteEnabled) {
+                    const group = this.get ? this.get('group') : this.group;
+                    const isMetaGroup = group?.isMetaGroup || (this.element && this.element.querySelector('.group.meta'));
+                    
+                    if (currentGameflowPhase === 'Lobby' && !isMetaGroup) {
+                        const tryInject = () => {
+                            const menuEl = document.querySelector('lol-uikit-context-menu');
+                            if (!menuEl) {
+                                requestAnimationFrame(tryInject);
+                                return;
+                            }
+
+                            const root = menuEl.shadowRoot;
+                            if (!root) {
+                                requestAnimationFrame(tryInject);
+                                return;
+                            }
+
+                            const container = root.querySelector('.context-menu, .context-menu-root');
+                            if (!container) {
+                                requestAnimationFrame(tryInject);
+                                return;
+                            }
+
+                            const existing = root.querySelector('[data-snooze-folder-invite-btn]');
+                            if (existing) {
+                                existing.remove();
+                            }
+
+                            const customItem = document.createElement('div');
+                            customItem.className = 'menu-item';
+                            customItem.setAttribute('data-snooze-folder-invite-btn', 'true');
+                            customItem.textContent = 'Invite Folder';
+
+                            customItem.addEventListener('click', async (e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+
+                                if (typeof menuEl.close === 'function') {
+                                    menuEl.close();
                                 }
 
-                                const root = menuEl.shadowRoot;
-                                if (!root) {
-                                    requestAnimationFrame(tryInject);
-                                    return;
+                                const name = group?.name || this.get?.('group.name') || this.get?.('name') || this.name;
+                                if (name) {
+                                    await inviteFolderGroup(name);
                                 }
+                            });
 
-                                const container = root.querySelector('.context-menu, .context-menu-root');
-                                if (!container) {
-                                    requestAnimationFrame(tryInject);
-                                    return;
-                                }
+                            container.prepend(customItem);
+                        };
 
-                                const existing = root.querySelector('[data-snooze-folder-invite-btn]');
-                                if (existing) {
-                                    existing.remove();
-                                }
-
-                                const customItem = document.createElement('div');
-                                customItem.className = 'menu-item';
-                                customItem.setAttribute('data-snooze-folder-invite-btn', 'true');
-                                customItem.textContent = 'Invite Folder';
-
-                                customItem.addEventListener('click', async (e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-
-                                    if (typeof menuEl.close === 'function') {
-                                        menuEl.close();
-                                    }
-
-                                    const name = group?.name || this.get?.('group.name') || this.get?.('name') || this.name;
-                                    if (name) {
-                                        await inviteFolderGroup(name);
-                                    }
-                                });
-
-                                container.prepend(customItem);
-                            };
-
-                            requestAnimationFrame(tryInject);
-                        }
+                        requestAnimationFrame(tryInject);
                     }
-                    this._super(...arguments);
                 }
-            };
-        }
+                original(...args);
+            }
+        }]
     });
 }
 

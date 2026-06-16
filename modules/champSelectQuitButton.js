@@ -51,45 +51,46 @@ export function init(context) {
     Utils.Hooks.Ember.registerRule({
         name: 'champ-select-quit-button-hook',
         matcher: 'champion-select',
-        mixin() {
-            return {
-                didInsertElement() {
-                    this._super(...arguments);
-                    if (!Utils.Store.get('champSelectQuitButton', 'enabled')) return;
-                    if (!this.element) return;
+        hookMethods: [{
+            name: 'didInsertElement',
+            callback(Ember, original, ...args) {
+                original(...args);
+                if (!Utils.Store.get('champSelectQuitButton', 'enabled')) return;
+                if (!this.element) return;
+                
+                const container = this.element.querySelector('.bottom-right-buttons');
+                if (!container) return;
+                
+                if (!container.querySelector('#pm-quit-btn')) {
+                    const btn = document.createElement('lol-uikit-flat-button');
+                    btn.id = 'pm-quit-btn';
+                    btn.textContent = 'Dodge';
+                    btn.style.cssText = 'margin-right: 10px; margin-top: 5px; width: auto; min-width: 80px; text-align: center;';
                     
-                    const container = this.element.querySelector('.bottom-right-buttons');
-                    if (!container) return;
+                    let dodging = false;
+                    btn.onclick = async () => {
+                        if (dodging) return;
+                        dodging = true;
+                        btn.disabled = true;
+                        try { await dodgeQueue(); } 
+                        finally { setTimeout(() => { dodging = false; btn.disabled = false; }, 1000); }
+                    };
                     
-                    if (!container.querySelector('#pm-quit-btn')) {
-                        const btn = document.createElement('lol-uikit-flat-button');
-                        btn.id = 'pm-quit-btn';
-                        btn.textContent = 'Dodge';
-                        btn.style.cssText = 'margin-right: 10px; margin-top: 5px; width: auto; min-width: 80px; text-align: center;';
-                        
-                        let dodging = false;
-                        btn.onclick = async () => {
-                            if (dodging) return;
-                            dodging = true;
-                            btn.disabled = true;
-                            try { await dodgeQueue(); } 
-                            finally { setTimeout(() => { dodging = false; btn.disabled = false; }, 1000); }
-                        };
-                        
-                        if (container.firstChild) {
-                            container.insertBefore(btn, container.firstChild);
-                        } else {
-                            container.appendChild(btn);
-                        }
+                    if (container.firstChild) {
+                        container.insertBefore(btn, container.firstChild);
+                    } else {
+                        container.appendChild(btn);
                     }
-                },
-                willDestroyElement() {
-                    const btn = document.getElementById('pm-quit-btn');
-                    if (btn) btn.remove();
-                    this._super(...arguments);
                 }
-            };
-        }
+            }
+        }, {
+            name: 'willDestroyElement',
+            callback(Ember, original, ...args) {
+                const btn = document.getElementById('pm-quit-btn');
+                if (btn) btn.remove();
+                original(...args);
+            }
+        }]
     });
 
     if (window.SnoozeManager && window.SnoozeManager.registerModule) {

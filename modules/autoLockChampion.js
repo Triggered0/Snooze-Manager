@@ -423,38 +423,39 @@ function installEmberTimerHook() {
     Utils.Hooks.Ember.registerRule({
         name: 'sm-auto-lock-timer',
         matcher: 'champion-select',
-        mixin() {
-            return {
-                didInsertElement() {
-                    this._super(...arguments);
-                    const t = this.get('session.timer.timeRemainingInMs');
-                    Utils.Debug.log('[AutoSelect] EmberHook didInsertElement: timer=', t, 'session=', this.get('session'));
-                    emberTimerMs = t;
-                    this._smUpdateTimer = () => {
-                        const v = this.get('session.timer.timeRemainingInMs');
-                        emberTimerMs = v;
-                        if (isEnabled && !panicActive) {
-                            const lockMs = getLockBeforeEndMs();
-                            if (lockMs > 0 && v !== null && v !== undefined) {
-                                if (v <= lockMs && !emberTimerCrossed) {
-                                    emberTimerCrossed = true;
-                                    Utils.Debug.log('[AutoSelect] Ember timer crossed threshold, triggering lock');
-                                    completePendingActions();
-                                } else if (v > lockMs) {
-                                    emberTimerCrossed = false;
-                                }
+        hookMethods: [{
+            name: 'didInsertElement',
+            callback(Ember, original, ...args) {
+                original(...args);
+                const t = this.get('session.timer.timeRemainingInMs');
+                Utils.Debug.log('[AutoSelect] EmberHook didInsertElement: timer=', t, 'session=', this.get('session'));
+                emberTimerMs = t;
+                this._smUpdateTimer = () => {
+                    const v = this.get('session.timer.timeRemainingInMs');
+                    emberTimerMs = v;
+                    if (isEnabled && !panicActive) {
+                        const lockMs = getLockBeforeEndMs();
+                        if (lockMs > 0 && v !== null && v !== undefined) {
+                            if (v <= lockMs && !emberTimerCrossed) {
+                                emberTimerCrossed = true;
+                                Utils.Debug.log('[AutoSelect] Ember timer crossed threshold, triggering lock');
+                                completePendingActions();
+                            } else if (v > lockMs) {
+                                emberTimerCrossed = false;
                             }
                         }
-                    };
-                    this.addObserver('session.timer.timeRemainingInMs', this, '_smUpdateTimer');
-                },
-                willDestroyElement() {
-                    Utils.Debug.log('[AutoSelect] EmberHook willDestroyElement');
-                    this.removeObserver('session.timer.timeRemainingInMs', this, '_smUpdateTimer');
-                    this._super(...arguments);
-                }
-            };
-        }
+                    }
+                };
+                this.addObserver('session.timer.timeRemainingInMs', this, '_smUpdateTimer');
+            }
+        }, {
+            name: 'willDestroyElement',
+            callback(Ember, original, ...args) {
+                Utils.Debug.log('[AutoSelect] EmberHook willDestroyElement');
+                this.removeObserver('session.timer.timeRemainingInMs', this, '_smUpdateTimer');
+                original(...args);
+            }
+        }]
     });
 }
 

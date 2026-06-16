@@ -271,37 +271,38 @@ export function init(context) {
     Utils.Hooks.Ember.registerRule({
         name: 'arena-god-grid-champion-hook',
         matcher: 'grid-champion',
-        mixin() {
-            return {
-                didRender() {
-                    this._super(...arguments);
-                    if (!isEnabled || !currentArenaMode || !this.element || !progressCache) return;
-                    
-                    const id = this.get('championConfiguration.champion.id');
-                    if (!id) return;
-                    
-                    // Ensure the parent container knows the grid is active
-                    const gridContainer = this.element.closest('.champion-grid');
-                    if (gridContainer && !gridContainer.classList.contains('sm-arena-active')) {
-                        gridContainer.classList.add('sm-arena-active');
-                    }
-                    
-                    if (progressCache.first.has(id)) {
-                        this.element.setAttribute('data-sm-status', 'first');
-                    } else if (progressCache.played.has(id)) {
-                        this.element.setAttribute('data-sm-status', 'played');
-                    } else {
-                        this.element.removeAttribute('data-sm-status');
-                    }
-                },
-                willDestroyElement() {
-                    if (this.element) {
-                        this.element.removeAttribute('data-sm-status');
-                    }
-                    this._super(...arguments);
+        hookMethods: [{
+            name: 'didRender',
+            callback(Ember, original, ...args) {
+                original(...args);
+                if (!isEnabled || !currentArenaMode || !this.element || !progressCache) return;
+                
+                const id = this.get('championConfiguration.champion.id');
+                if (!id) return;
+                
+                // Ensure the parent container knows the grid is active
+                const gridContainer = this.element.closest('.champion-grid');
+                if (gridContainer && !gridContainer.classList.contains('sm-arena-active')) {
+                    gridContainer.classList.add('sm-arena-active');
                 }
-            };
-        }
+                
+                if (progressCache.first.has(id)) {
+                    this.element.setAttribute('data-sm-status', 'first');
+                } else if (progressCache.played.has(id)) {
+                    this.element.setAttribute('data-sm-status', 'played');
+                } else {
+                    this.element.removeAttribute('data-sm-status');
+                }
+            }
+        }, {
+            name: 'willDestroyElement',
+            callback(Ember, original, ...args) {
+                if (this.element) {
+                    this.element.removeAttribute('data-sm-status');
+                }
+                original(...args);
+            }
+        }]
     });
 }
 

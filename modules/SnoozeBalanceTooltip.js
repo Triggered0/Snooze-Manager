@@ -341,29 +341,26 @@ export function init(context) {
         Utils.Hooks.Ember.registerRule({
             name: `balance-tooltip-${r.name}-hook`,
             matcher: r.name,
-            mixin() {
-                return {
-                    didInsertElement() {
-                        if (typeof this._super === 'function') {
-                            this._super(...arguments);
-                        }
-                        if (!this.element) return;
-                        
-                        this.element.addEventListener('mouseenter', () => {
-                            showBalanceTooltip(this, r.pos);
-                        });
-                        this.element.addEventListener('mouseleave', () => {
-                            hideTT();
-                        });
-                    },
-                    willDestroyElement() {
+            hookMethods: [{
+                name: 'didInsertElement',
+                callback(Ember, original, ...args) {
+                    original(...args);
+                    if (!this.element) return;
+                    
+                    this.element.addEventListener('mouseenter', () => {
+                        showBalanceTooltip(this, r.pos);
+                    });
+                    this.element.addEventListener('mouseleave', () => {
                         hideTT();
-                        if (typeof this._super === 'function') {
-                            this._super(...arguments);
-                        }
-                    }
-                };
-            }
+                    });
+                }
+            }, {
+                name: 'willDestroyElement',
+                callback(Ember, original, ...args) {
+                    hideTT();
+                    original(...args);
+                }
+            }]
         });
     });
 

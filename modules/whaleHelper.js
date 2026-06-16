@@ -1483,17 +1483,21 @@ export function installEmberHook() {
     Utils.Hooks.Ember.registerRule({
         name: 'whale-helper-hook',
         matcher: 'loot-mass-disenchant-action-tab',
-        mixin() {
-            return {
-                didRender() {
-                    this._super(...arguments);
-                    if (!isLootEnabled || !this.element) return;
-                    const container = this.element.closest('.loot-action-tabs-container') ?? this.element.parentElement;
-                    if (container) injectButton(container);
-                },
-                willDestroyElement() { removeButton(); this._super(...arguments); }
-            };
-        }
+        hookMethods: [{
+            name: 'didRender',
+            callback(Ember, original, ...args) {
+                original(...args);
+                if (!isLootEnabled || !this.element) return;
+                const container = this.element.closest('.loot-action-tabs-container') ?? this.element.parentElement;
+                if (container) injectButton(container);
+            }
+        }, {
+            name: 'willDestroyElement',
+            callback(Ember, original, ...args) {
+                removeButton();
+                original(...args);
+            }
+        }]
     });
 
     Utils.Hooks.Ember.registerRule({

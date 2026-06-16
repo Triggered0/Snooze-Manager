@@ -73,33 +73,32 @@ function installEmberHook() {
     Utils.Hooks.Ember.registerRule({
         name: 'custom-online-status-identity',
         matcher: 'lol-social-identity',
-        mixin() {
-            return {
-                didInsertElement() {
-                    this._super(...arguments);
-                    const hitbox = this.element.querySelector('.lol-social-availability-hitbox');
-                    if (hitbox && !hitbox.hasAttribute('data-pm-status-menu-hook')) {
-                        hitbox.setAttribute('data-pm-status-menu-hook', 'true');
-                        hitbox.addEventListener('click', (e) => {
-                            const currentEnabled = Utils.Store.get('customOnlineStatus', 'enabled');
-                            if (!currentEnabled) return;
-                            e.stopPropagation(); e.stopImmediatePropagation();
-                            const customMenu = getStatusMenu();
-                            const r = hitbox.getBoundingClientRect();
-                            customMenu.style.left = 'auto';
-                            customMenu.style.right = (window.innerWidth - r.right) + 'px';
-                            customMenu.style.top = (r.bottom + 5) + 'px';
-                            customMenu.style.display = 'block';
-                            if (Utils.LCU) {
-                                Utils.LCU.get('/lol-chat/v1/me').then(me => {
-                                    if (me && statusMsgInput) statusMsgInput.value = me.statusMessage || '';
-                                }).catch(() => {});
-                            }
-                        }, true);
-                    }
-                },
-            };
-        },
+        hookMethods: [{
+            name: 'didInsertElement',
+            callback(Ember, original, ...args) {
+                original(...args);
+                const hitbox = this.element.querySelector('.lol-social-availability-hitbox');
+                if (hitbox && !hitbox.hasAttribute('data-pm-status-menu-hook')) {
+                    hitbox.setAttribute('data-pm-status-menu-hook', 'true');
+                    hitbox.addEventListener('click', (e) => {
+                        const currentEnabled = Utils.Store.get('customOnlineStatus', 'enabled');
+                        if (!currentEnabled) return;
+                        e.stopPropagation(); e.stopImmediatePropagation();
+                        const customMenu = getStatusMenu();
+                        const r = hitbox.getBoundingClientRect();
+                        customMenu.style.left = 'auto';
+                        customMenu.style.right = (window.innerWidth - r.right) + 'px';
+                        customMenu.style.top = (r.bottom + 5) + 'px';
+                        customMenu.style.display = 'block';
+                        if (Utils.LCU) {
+                            Utils.LCU.get('/lol-chat/v1/me').then(me => {
+                                if (me && statusMsgInput) statusMsgInput.value = me.statusMessage || '';
+                            }).catch(() => {});
+                        }
+                    }, true);
+                }
+            }
+        }]
     });
 }
 
