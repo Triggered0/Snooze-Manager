@@ -1325,7 +1325,6 @@ export function installEmberHook() {
                 name: 'didInsertElement',
                 callback(Ember, original, ...args) {
                     original(...args);
-                    if (this.element) this.element.dataset.snoozeFriendName = this.get('gameName') || '';
                     refreshRosterMemberElement(this.element);
                 }
             },
@@ -1333,7 +1332,6 @@ export function installEmberHook() {
                 name: 'didRender',
                 callback(Ember, original, ...args) {
                     original(...args);
-                    if (this.element) this.element.dataset.snoozeFriendName = this.get('gameName') || '';
                     refreshRosterMemberElement(this.element);
                 }
             },

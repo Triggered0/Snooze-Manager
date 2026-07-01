@@ -10,6 +10,7 @@ import Utils from './generalUtils.js';
 const MODULE = 'nameSpoofer';
 
 let _emberProvider = null;
+let _hasSpoofedAnything = false;
 
 // In-memory mirror of the persisted config (read on every hook, so keep it hot).
 const cfg = {
@@ -61,7 +62,35 @@ function catLabel(category, key) {
 // Known-friend membership, so friends are aliased wherever they appear (even when
 // numbering is off and catLabel doesn't populate its map).
 const friendPuuids = new Set();
-function friendLabel(key) { if (key) friendPuuids.add(key); return catLabel('friend', key); }
+const friendRegistry = new Map(); // key='puuid:<uuid>' or 'name:<name>' → {spoofLabel, realName}
+let friendCounter = 0;
+function friendLabel(key) {
+    if (key) friendPuuids.add(key);
+    if (key && friendRegistry.has('puuid:' + key)) return friendRegistry.get('puuid:' + key).spoofLabel;
+    return registerFriend(null, key);
+}
+function registerFriend(realName, puuid) {
+    if (puuid) {
+        const k = 'puuid:' + puuid;
+        if (friendRegistry.has(k)) { const e = friendRegistry.get(k); if (realName) realToAlias[realName] = e.spoofLabel; return e.spoofLabel; }
+    }
+    if (realName) {
+        const k = 'name:' + realName;
+        if (friendRegistry.has(k)) { const e = friendRegistry.get(k); if (puuid) { friendPuuids.add(puuid); friendRegistry.set('puuid:' + puuid, e); } return e.spoofLabel; }
+    }
+    const [base, useNum] = catCfg('friend');
+    friendCounter++;
+    const label = useNum ? (base + ' ' + friendCounter) : base;
+    const entry = { spoofLabel: label, realName };
+    if (puuid) { friendPuuids.add(puuid); friendRegistry.set('puuid:' + puuid, entry); }
+    if (realName) { friendRegistry.set('name:' + realName, entry); realToAlias[realName] = label; }
+    return label;
+}
+function lookupFriend(puuid, nameText) {
+    if (puuid) { const e = friendRegistry.get('puuid:' + puuid.split('@')[0]); if (e) return e.spoofLabel; }
+    if (nameText) { const e = friendRegistry.get('name:' + nameText); if (e) return e.spoofLabel; }
+    return null;
+}
 
 // Match-history / post-game others are numbered by render order per game.
 function nextOther(counters) {
@@ -71,10 +100,19 @@ function nextOther(counters) {
     return base + ' ' + counters.n;
 }
 
+// Per-game counter for swapNameText fallback (enemies in post-game/honor).
+let _postgameNameIndex = 0;
+
 // Real name -> alias capture, so the DOM scrubber can fix cached renders (hovercard).
 const realToAlias = {};
 function noteFriend(realName, label) {
-    if (realName && label && realName !== label) realToAlias[realName.replace(/[⁦-⁩‎‏]/g, '')] = label;
+    if (realName && label && realName !== label) {
+        const clean = realName.replace(/[⁦-⁩‎‏]/g, '');
+        if (clean === label) return;
+        // Prevent alias-to-alias entries: don't register an alias as a real name
+        for (const v of Object.values(realToAlias)) { if (v === clean) return; }
+        realToAlias[clean] = label;
+    }
 }
 
 // Per-match-history context for component-data fallback (cached entries that
@@ -93,6 +131,7 @@ function _mhAliasFromComponent(comp) {
     if (!player) { logDebug('mh-alias', 'null player'); return null; }
     const pName = nameOf(player);
     if (!pName) { logDebug('mh-alias', 'null pName'); return null; }
+    const pPuuid = puuidOf(player);
     const ctx = _mhCtxGet();
     const pTeamId = part ? (part.teamId || player.teamId) : player.teamId;
     // Detect self via CSS class `me` FIRST; return self alias
@@ -115,11 +154,18 @@ function _mhAliasFromComponent(comp) {
     if (ctx.selfTeamId == null || pTeamId == null) return null;
     // Local cache prevents double-counting on rerender triggered by the self
     // detection microtask above
-    if (ctx._mhLabels && ctx._mhLabels[pName] !== undefined) return ctx._mhLabels[pName];
+    const cacheKey = pPuuid || pName;
+    if (ctx._mhLabels && ctx._mhLabels[cacheKey] !== undefined) return ctx._mhLabels[cacheKey];
     if (!ctx._mhLabels) ctx._mhLabels = {};
+    // Check if this player is a known friend
+    if (pPuuid && friendPuuids.has(pPuuid)) {
+        const label = friendLabel(pPuuid);
+        ctx._mhLabels[cacheKey] = label;
+        return label;
+    }
     const [base, useNum] = catCfg('global');
     const label = useNum ? (base + ' ' + (++ctx.otherN)) : base;
-    ctx._mhLabels[pName] = label;
+    ctx._mhLabels[cacheKey] = label;
     logDebug('mh', 'alias "' + pName + '" teamId=' + pTeamId + ' selfTeamId=' + ctx.selfTeamId + ' -> ' + label);
     return label;
 }
@@ -214,6 +260,12 @@ const MATCH_HISTORY_ENDPOINTS = [
 const POST_GAME_ENDPOINTS = [
     '/lol-end-of-game/v1/eog-stats-block',
     '/lol-honor-v2/v1/ballot'
+];
+
+// Champ-select data endpoints — names flow through here to the chat iframe override JSON
+const CHAMPSELECT_ENDPOINTS = [
+    '/lol-champ-select/v1/session',
+    '/lol-champ-select/v1/summoners/'
 ];
 
 // WebSocket pushes that carry our identity.
@@ -311,11 +363,12 @@ function aliasConversations(data, selfOn) {
         if (selfOn) applyName(data, true, cfg.gameName, cfg.tagLine);
     } else if (hasNameField(data)) {
         const pu = puuidOf(data);
-        const key = pu || nameOf(data);
+        const nm = nameOf(data);
+        const key = pu || nm;
         if (key) {
             let l;
             if (pu && friendPuuids.has(pu)) {
-                l = friendLabel(pu);
+                l = registerFriend(nm, pu);
             } else {
                 l = catLabel('global', key);
             }
@@ -347,22 +400,69 @@ function aliasFriendsList(node, selfOn, category) {
             const pu = puuidOf(node);
             const key = pu || (node.summonerId && ('sid:' + node.summonerId)) || nameOf(node);
             if (key) {
-                if (category === 'friend' && pu) friendPuuids.add(pu);
-                const l = catLabel(category, key);
-                noteFriend(nameOf(node), l);
-                applyName(node, true, l, '');
+                const nm = nameOf(node);
+                if (category === 'friend') {
+                    const l = registerFriend(nm, pu);
+                    noteFriend(nm, l);
+                    applyName(node, true, l, '');
+                } else {
+                    if (pu) friendPuuids.add(pu);
+                    const l = catLabel(category, key);
+                    noteFriend(nm, l);
+                    applyName(node, true, l, '');
+                }
             }
         }
     }
     for (const k in node) { const v = node[k]; if (v && typeof v === 'object') aliasFriendsList(v, selfOn, category); }
 }
 
+async function syncFriends() {
+    if (!Utils.LCU) return;
+    try {
+        const friends = await Utils.LCU.get('/lol-chat/v1/friends');
+        if (Array.isArray(friends)) {
+            for (const f of friends) {
+                const pu = puuidOf(f);
+                const nm = nameOf(f);
+                if (pu && nm) registerFriend(nm, pu);
+            }
+        }
+    } catch (e) {
+        logDebug('syncFriends', 'failed: ' + e);
+    }
+}
+
+function resolveAlias(nm, pu, counters) {
+    if (!nm) return null;
+    // Check friend status FIRST (before realToAlias cache) so a stale "Player N"
+    // label from an early sweep gets corrected once friendPuuids is populated.
+    if (pu && friendPuuids.has(pu)) {
+        const label = friendLabel(pu);
+        noteFriend(nm, label);
+        return label;
+    }
+    if (realToAlias[nm]) return realToAlias[nm];
+    if (counters) {
+        const label = nextOther(counters);
+        noteFriend(nm, label);
+        return label;
+    }
+    const key = pu || ('name:' + nm);
+    const label = catLabel('global', key);
+    noteFriend(nm, label);
+    return label;
+}
+
 function applyOther(o, counters, selfOn, readOnly) {
     if (!o || typeof o !== 'object') return;
     if (isSelf(o)) { if (selfOn && !readOnly) applyName(o, true, cfg.gameName, cfg.tagLine); return; }
-    const label = nextOther(counters);
     const nm = nameOf(o);
-    if (!readOnly || !realToAlias[nm]) noteFriend(nm, label);
+    if (!nm) return;
+    const pu = puuidOf(o);
+    const label = resolveAlias(nm, pu, counters);
+    if (!label) return;
+    if (!readOnly) noteFriend(nm, label);
     if (!readOnly) applyName(o, true, label, '');
 }
 
@@ -504,6 +604,7 @@ function installXhrFallback() {
     reg('/lol-chat/v1/friends', () => ({ isMeRoot: false, others: cfg.spoofFriends ? 'friendsList' : false }));
     for (const ep of MATCH_HISTORY_ENDPOINTS) reg(ep, () => { _mhCtx = null; return { others: 'team', collectOnly: true }; });
     for (const ep of POST_GAME_ENDPOINTS) reg(ep, () => ({ others: 'team', collectOnly: true }));
+    for (const ep of CHAMPSELECT_ENDPOINTS) reg(ep, () => ({ isMeRoot: false, others: 'conversations' }));
 }
 function installXhr() {
     if (_xhrInstalled) return;
@@ -530,6 +631,7 @@ function installHooks(context) {
     for (const ep of GENERIC_ENDPOINTS) reg(ep, () => ({ isMeRoot: false, others: false }));
     for (const ep of MATCH_HISTORY_ENDPOINTS) reg(ep, () => { _mhCtx = null; return { others: 'team', collectOnly: true }; });
     for (const ep of POST_GAME_ENDPOINTS) reg(ep, () => ({ others: 'team', collectOnly: true }));
+    for (const ep of CHAMPSELECT_ENDPOINTS) reg(ep, () => ({ isMeRoot: false, others: 'conversations' }));
 
     _fetchCleanups.push(Utils.Hooks.Fetch.hookRes('/lol-chat/v1/conversations', (text) => transformText(text, { isMeRoot: false, others: 'conversations' })));
     _xhrRoutes.unshift({ pattern: '/lol-chat/v1/conversations', optsFn: () => ({ isMeRoot: false, others: 'conversations' }) });
@@ -544,6 +646,75 @@ function installHooks(context) {
             return payload;
         });
     }
+    // Champ-select session WS: transform names in the session data
+    Utils.Hooks.WS.hook('/lol-champ-select/v1/session', (_endpoint, payload) => {
+        if (!payload || typeof payload !== 'object') return payload;
+        try {
+            const teams = ['myTeam', 'theirTeam'];
+            for (const teamKey of teams) {
+                const members = payload[teamKey];
+                if (!Array.isArray(members)) continue;
+                for (const m of members) {
+                    if (!m || typeof m !== 'object') continue;
+                    const nm = nameOf(m);
+                    if (!nm) continue;
+                    if (isSelf(m)) {
+                        if (active()) applyName(m, true, cfg.gameName, cfg.tagLine);
+                    } else if (cfg.spoofFriends || aliasOthersNow()) {
+                        const pu = puuidOf(m);
+                        const alias = resolveAlias(nm, pu);
+                        if (alias && alias !== nm) {
+                            applyName(m, true, alias, '');
+                        }
+                    }
+                }
+            }
+        } catch (e) { Utils.Debug.warn('[NameSpoofer] ChampSelect WS transform failed:', e); }
+        return payload;
+    });
+
+    // Friends list WS: alias known friends on live updates
+    Utils.Hooks.WS.hook('/lol-chat/v1/friends', (_endpoint, payload) => {
+        if (!payload || typeof payload !== 'object') return payload;
+        if (!cfg.enabled || !cfg.spoofFriends) return payload;
+        try {
+            aliasFriendsList(payload, active(), 'friend');
+        } catch (e) { Utils.Debug.warn('[NameSpoofer] WS friends transform failed:', e); }
+        return payload;
+    });
+
+    // Conversations WS: alias participants on live updates
+    Utils.Hooks.WS.hook('/lol-chat/v1/conversations', (_endpoint, payload) => {
+        if (!payload || typeof payload !== 'object') return payload;
+        if (!cfg.enabled) return payload;
+        if (!active() && !cfg.spoofFriends) return payload;
+        try {
+            aliasConversations(payload, active());
+        } catch (e) { Utils.Debug.warn('[NameSpoofer] WS conversations transform failed:', e); }
+        return payload;
+    });
+
+    // Honor ballot WS: alias all players in post-game voting ceremony
+    Utils.Hooks.WS.hook('/lol-honor-v2/v1/ballot', (_endpoint, payload) => {
+        if (!payload || typeof payload !== 'object') return payload;
+        if (!cfg.enabled) return payload;
+        if (!active() && !aliasOthersNow() && !cfg.spoofFriends && !cfg.spoofMatchHistory) return payload;
+        try {
+            aliasTeam(payload, active(), false);
+        } catch (e) { Utils.Debug.warn('[NameSpoofer] WS ballot transform failed:', e); }
+        return payload;
+    });
+
+    // Post-game stats block WS: alias players in end-of-game stats
+    Utils.Hooks.WS.hook('/lol-end-of-game/v1/eog-stats-block', (_endpoint, payload) => {
+        if (!payload || typeof payload !== 'object') return payload;
+        if (!cfg.enabled) return payload;
+        if (!active() && !aliasOthersNow() && !cfg.spoofFriends && !cfg.spoofMatchHistory) return payload;
+        try {
+            aliasTeam(payload, active(), false);
+        } catch (e) { Utils.Debug.warn('[NameSpoofer] WS eog-stats transform failed:', e); }
+        return payload;
+    });
 }
 
 async function refreshContext() {
@@ -583,17 +754,39 @@ async function captureRealIdentity() {
         if (real.gameName !== cfg.gameName) {
             realToAlias[real.gameName] = cfg.gameName;
         }
-        rerenderTracked();
-        DomScrubber.install();
-        DomScrubber.sweep();
-        installTooltipObserver();
-        installChatObserver();
+
+        if (cfg.enabled) {
+            rerenderTracked();
+            processMatchHistoryRows();
+            triggerRosterRebuild();
+        }
     } catch (e) {
-        if (cfg.enabled) setTimeout(captureRealIdentity, 1500);
+        setTimeout(captureRealIdentity, 1500);
     }
 }
 
 const OVERRIDE_ATTR = 'puuids-to-name-overrides-json';
+
+let _overrideAttrObserver = null;
+function installOverrideAttrObserver() {
+    if (_overrideAttrObserver) return;
+    _overrideAttrObserver = new MutationObserver(() => {
+        if (!scrubActive()) return;
+        document.querySelectorAll('[' + OVERRIDE_ATTR + ']').forEach((el) => {
+            DomScrubber._fixOverrideAttr(el);
+        });
+    });
+    _overrideAttrObserver.observe(document.body, {
+        childList: true, subtree: true, attributes: true, attributeFilter: [OVERRIDE_ATTR]
+    });
+    // Immediately fix any existing elements
+    document.querySelectorAll('[' + OVERRIDE_ATTR + ']').forEach((el) => {
+        DomScrubber._fixOverrideAttr(el);
+    });
+}
+function stopOverrideAttrObserver() {
+    if (_overrideAttrObserver) { _overrideAttrObserver.disconnect(); _overrideAttrObserver = null; }
+}
 
 function restoreTextNodeText(node) {
     if (!node || !node.nodeValue) return;
@@ -663,6 +856,7 @@ const DomScrubber = {
 
     _applyFrameDoc(doc) {
         if (!doc) return;
+        if (!cfg.enabled && !_hasSpoofedAnything) return;
         try {
             if (scrubActive()) {
                 doc.querySelectorAll('[' + OVERRIDE_ATTR + ']').forEach((el) => this._fixOverrideAttr(el));
@@ -738,7 +932,7 @@ const DomScrubber = {
     _fixOverrideAttr(el) {
         if (!el || !el.getAttribute) return;
         const selfOn = active() && cfg.gameName && real.puuid;
-        const othersOn = aliasOthersNow();
+        const othersOn = aliasOthersNow() || cfg.spoofFriends || cfg.spoofMatchHistory;
         if (!selfOn && !othersOn) return;
         try {
             const raw = el.getAttribute(OVERRIDE_ATTR);
@@ -747,11 +941,13 @@ const DomScrubber = {
             let changed = false;
             for (const puuid in map) {
                 let desired = map[puuid];
-                if (selfOn && puuid === real.puuid) desired = cfg.gameName;
-                else if (othersOn && puuid !== real.puuid) {
+                if (selfOn && puuid === real.puuid) {
+                    desired = cfg.gameName;
+                } else if (othersOn && puuid !== real.puuid) {
                     const curName = map[puuid];
-                    if (curName && realToAlias[curName]) {
-                        desired = realToAlias[curName];
+                    const alias = resolveAlias(curName, puuid === '00000000-0000-0000-0000-000000000000' ? null : puuid);
+                    if (alias && alias !== curName) {
+                        desired = alias;
                     }
                 }
                 if (desired !== map[puuid]) { map[puuid] = desired; changed = true; }
@@ -786,6 +982,15 @@ function installTooltipObserver() {
 }
 function stopTooltipObserver() {
     if (_tooltipObs) { _tooltipObs.disconnect(); _tooltipObs = null; }
+    // Restore already-modified tooltip names (walk through shadow DOMs)
+    if (!real.gameName) return;
+    const aliasToReal = {};
+    for (const rn of Object.keys(realToAlias)) aliasToReal[realToAlias[rn]] = rn;
+    for (const el of _queryAllShadow(TOOLTIP_SELECTOR)) {
+        const cur = (el.textContent || '').replace(/[⁦-⁩‎‏]/g, '').trim();
+        const realName = aliasToReal[cur] || real.gameName;
+        if (realName && realName !== cur) el.textContent = realName;
+    }
 }
 const CHAT_NAME_SELECTORS = '.conversation-title, .player-name__game-name, .player-name__alias, .create-panel-game-name, .create-panel-gnt';
 function patchUikitName(el) {
@@ -798,6 +1003,23 @@ function installChatObserver() {
     if (target.querySelectorAll) {
         for (const u of target.querySelectorAll('lol-uikit-player-name')) patchUikitName(u);
     }
+    // Sweep existing chat name elements (e.g. after restore + re-enable)
+    const sweepChatNames = () => {
+        if (!cfg.enabled) return;
+        const els = _queryAllShadow(CHAT_NAME_SELECTORS);
+        Utils.Debug.log('[NS-DEBUG][chat] sweep found ' + els.length + ' elements');
+        for (const el of els) {
+            // Skip conversation titles in the initial sweep — let deferred sweep
+            // handle them after roster rebuild assigns stable realToAlias numbers.
+            if (el.matches('.conversation-title')) continue;
+            const cur = (el.textContent || '').replace(/[⁦-⁩‎‏]/g, '').trim();
+            Utils.Debug.log('[NS-DEBUG][chat] sweep el="' + (el.className || el.tagName) + '" cur="' + cur + '" realToAliasKey=' + (realToAlias[cur] ? 'yes' : 'no'));
+            const convo = el.closest('.conversation');
+            const puuid = convo ? convo.getAttribute('data-id') : null;
+            swapNameText(el.parentElement || el, puuid);
+        }
+    };
+    sweepChatNames();
     _chatObs = new MutationObserver((mutations) => {
         if (!scrubActive() || !real.gameName) return;
         for (const m of mutations) {
@@ -808,10 +1030,14 @@ function installChatObserver() {
             for (const n of m.addedNodes) {
                 if (n.nodeType !== 1) continue;
                 if (n.matches && n.matches(CHAT_NAME_SELECTORS)) {
-                    swapNameText(n.parentElement || n);
+                    const convo = n.closest('.conversation');
+                    swapNameText(n.parentElement || n, convo ? convo.getAttribute('data-id') : null);
                 } else if (n.querySelectorAll) {
                     const matches = n.querySelectorAll(CHAT_NAME_SELECTORS);
-                    for (const el of matches) swapNameText(el.parentElement || el);
+                    for (const el of matches) {
+                        const convo = el.closest('.conversation');
+                        swapNameText(el.parentElement || el, convo ? convo.getAttribute('data-id') : null);
+                    }
                 }
                 if (n.matches && n.matches('lol-uikit-player-name')) {
                     patchUikitName(n);
@@ -823,9 +1049,132 @@ function installChatObserver() {
         }
     });
     _chatObs.observe(target, { childList: true, subtree: true, attributes: true, attributeFilter: ['game-name'] });
+    // Deferred re-sweep after roster rebuild populates realToAlias
+    setTimeout(() => {
+        if (!cfg.enabled) return;
+        const els = _queryAllShadow(CHAT_NAME_SELECTORS);
+        Utils.Debug.log('[NS-DEBUG][chat] deferred sweep found ' + els.length + ' elements');
+        for (const el of els) {
+            if (el.matches('.summoner-level') || el.closest('.summoner-level')) continue;
+            const cur = (el.textContent || '').replace(/[⁦-⁩‎‏]/g, '').trim();
+            const alias = realToAlias[cur];
+            Utils.Debug.log('[NS-DEBUG][chat] deferred el="' + (el.className || el.tagName) + '" cur="' + cur + '" alias="' + (alias || 'null') + '"');
+            if (!cur || cur === cfg.gameName || cur === real.gameName) continue;
+            if (alias && alias !== cur) { el.textContent = alias; continue; }
+            const convo = el.closest('.conversation');
+            if (convo) {
+                const rawPuuid = convo.getAttribute('data-id') || '';
+                const label = lookupFriend(rawPuuid, cur);
+                if (label && label !== cur) { el.textContent = label; continue; }
+                const puuid = rawPuuid.split('@')[0];
+                if (friendPuuids.has(puuid)) {
+                    const fallback = friendLabel(puuid);
+                    if (fallback && fallback !== cur) el.textContent = fallback;
+                }
+            }
+        }
+    }, 1500);
 }
 function stopChatObserver() {
     if (_chatObs) { _chatObs.disconnect(); _chatObs = null; }
+    // Restore already-modified chat names (walk through shadow DOMs)
+    if (!real.gameName) return;
+    const aliasToReal = {};
+    for (const rn of Object.keys(realToAlias)) aliasToReal[realToAlias[rn]] = rn;
+    for (const el of _queryAllShadow(CHAT_NAME_SELECTORS)) {
+        if (el.matches('.summoner-level') || el.closest('.summoner-level')) continue;
+        const cur = (el.textContent || '').replace(/[⁦-⁩‎‏]/g, '').trim();
+        const realName = aliasToReal[cur];
+        if (realName && realName !== cur) el.textContent = realName;
+    }
+}
+
+function _queryAllShadow(selector, root) {
+    // Recursively walk shadow roots to find elements that document.querySelectorAll can't see
+    const results = [];
+    (function walk(ctx) {
+        if (!ctx || !ctx.querySelectorAll) return;
+        results.push(...ctx.querySelectorAll(selector));
+        for (const el of ctx.querySelectorAll('*')) {
+            if (el.shadowRoot) walk(el.shadowRoot);
+        }
+    })(root || document);
+    return results;
+}
+
+let _inviteOrigSummonerName = null;
+function installInviteObserver() {
+    if (_inviteOrigSummonerName) return;
+    const Klass = customElements.get('lol-parties-game-invite');
+    if (!Klass || !Klass.prototype) { Utils.Debug.log('[NS-DEBUG][invite] lol-parties-game-invite not registered yet'); return; }
+    const orig = Klass.prototype._summonerName;
+    if (!orig) { Utils.Debug.log('[NS-DEBUG][invite] no _summonerName on prototype'); return; }
+    _inviteOrigSummonerName = orig;
+    Klass.prototype._summonerName = async function (element, summonerId) {
+        // Run original only if not cached (avoids double fetch)
+        if (!this._name) await orig.call(this, element, summonerId);
+        // Always attempt spoofing, even if name was already cached before our patch
+        const cur = (element.textContent || '').replace(/[⁦-⁩‎‏]/g, '').trim();
+        Utils.Debug.log('[NS-DEBUG][invite] _summonerName cur="' + cur + '" sid=' + summonerId + ' cfg.enabled=' + cfg.enabled);
+        if (!cfg.enabled || !cur || cur === cfg.gameName || cur === real.gameName) return;
+        const puKey = summonerId ? ('sid:' + summonerId) : undefined;
+        const alias = resolveAlias(cur, puKey);
+        Utils.Debug.log('[NS-DEBUG][invite] resolveAlias -> ' + alias);
+        if (alias && alias !== cur) element.innerHTML = alias;
+    };
+    Utils.Debug.log('[NS-DEBUG][invite] patched _summonerName');
+    // Sweep existing instances (already rendered before patch) through shadow DOMs
+    for (const host of _queryAllShadow('lol-parties-game-invite')) {
+        const root = host.shadowRoot;
+        if (!root) continue;
+        // Get summoner ID from the stored invite data for friend detection
+        const sid = host._gameInvite && host._gameInvite.fromSummonerId;
+        const sidKey = sid ? ('sid:' + sid) : undefined;
+        delete host._name;
+        for (const nameEl of root.querySelectorAll('.parties-game-invite-name')) {
+            const cur = (nameEl.textContent || '').replace(/[⁦-⁩‎‏]/g, '').trim();
+            if (!cfg.enabled || !cur || cur === cfg.gameName || cur === real.gameName) continue;
+            const alias = resolveAlias(cur, sidKey);
+            Utils.Debug.log('[NS-DEBUG][invite] sweep cur="' + cur + '" sidKey=' + sidKey + ' alias="' + alias + '"');
+            if (alias && alias !== cur) nameEl.innerHTML = alias;
+        }
+    }
+    // Deferred resweep after friend data settles (roster rebuild, conversation fetch, etc.)
+    setTimeout(() => {
+        if (!cfg.enabled) return;
+        for (const host of _queryAllShadow('lol-parties-game-invite')) {
+            const root = host.shadowRoot;
+            if (!root) continue;
+            const sid = host._gameInvite && host._gameInvite.fromSummonerId;
+            const sidKey = sid ? ('sid:' + sid) : undefined;
+            for (const nameEl of root.querySelectorAll('.parties-game-invite-name')) {
+                const cur = (nameEl.textContent || '').replace(/[⁦-⁩‎‏]/g, '').trim();
+                if (!cfg.enabled || !cur || cur === cfg.gameName || cur === real.gameName) continue;
+                const alias = resolveAlias(cur, sidKey);
+                Utils.Debug.log('[NS-DEBUG][invite] defer cur="' + cur + '" sidKey=' + sidKey + ' alias="' + alias + '"');
+                if (alias && alias !== cur && alias !== nameEl.textContent) nameEl.innerHTML = alias;
+            }
+        }
+    }, 1500);
+}
+function stopInviteObserver() {
+    if (!_inviteOrigSummonerName) return;
+    const Klass = customElements.get('lol-parties-game-invite');
+    if (Klass && Klass.prototype) {
+        Klass.prototype._summonerName = _inviteOrigSummonerName;
+    }
+    _inviteOrigSummonerName = null;
+    Utils.Debug.log('[NS-DEBUG][invite] restored _summonerName');
+    // Restore original names on existing instances
+    for (const host of _queryAllShadow('lol-parties-game-invite')) {
+        const root = host.shadowRoot;
+        if (!root) continue;
+        delete host._name;
+        if (host._gameInvite) {
+            // Re-run the original name-fetching to overwrite our spoofed values
+            host._inviteFromPlayerText(host._gameInvite);
+        }
+    }
 }
 
 const spoofSummonerName = (name) => {
@@ -843,7 +1192,9 @@ const spoofSummonerName = (name) => {
             if (T && ST !== T && v.indexOf(T) !== -1) { v = v.split(T).join(ST); }
         }
         if (cfg.spoofFriends || aliasOthersNow()) {
+            const aliasValues = new Set(Object.values(realToAlias));
             for (const rn of Object.keys(realToAlias)) {
+                if (aliasValues.has(rn)) continue; // skip keys that are already aliases (prevent cascade)
                 const alias = realToAlias[rn];
                 if (alias !== rn && v.indexOf(rn) !== -1) { v = v.split(rn).join(alias); }
             }
@@ -866,6 +1217,7 @@ function applyConfig() {
     const oldName = cfg.gameName;
     const oldTag = cfg.tagLine;
     loadConfig();
+    if (cfg.enabled) _hasSpoofedAnything = true;
     if (oldName && oldName !== cfg.gameName) {
         noteFriend(oldName, cfg.gameName);
     }
@@ -879,10 +1231,14 @@ function applyConfig() {
         DomScrubber.sweep();
         installTooltipObserver();
         installChatObserver();
+        installOverrideAttrObserver();
+        installInviteObserver();
     } else {
         DomScrubber.restore();
         stopTooltipObserver();
         stopChatObserver();
+        stopOverrideAttrObserver();
+        stopInviteObserver();
     }
     if (wasEnabled !== cfg.enabled) {
         for (const c of _partyComponents) {
@@ -904,6 +1260,7 @@ function applyConfig() {
 }
 
 function processMatchHistoryRows() {
+    if (!cfg.enabled && !_hasSpoofedAnything) return;
     if (!real.gameName) return;
     logDebug('mh-process', 'processing ' + _mhComponents.size + ' components');
     for (const comp of _mhComponents) {
@@ -963,17 +1320,30 @@ function aliasTextNodeText(node) {
     if (changed) node.nodeValue = v;
 }
 
-const NAME_SELECTORS = '.name-text, .player-name__game-name, .player-game-name, .member-name, .create-panel-game-name, .hover-card-name, [class*="game-name"]';
+const NAME_SELECTORS = '.name-text, .player-name__game-name, .player-game-name, .member-name, .create-panel-game-name, .hover-card-name, .parties-game-invite-name, [class*="game-name"]';
 const TAG_LINE_SELECTORS = '.hover-card-game-tag-text, .player-name__tag-line, [class*="game-tag"], [class*="tag-line"]';
 
 function swapNameText(el, contextPuuid) {
+    if (!cfg.enabled && !_hasSpoofedAnything) return;
     if (!el || !real.gameName) return;
+    if (el.closest && (el.closest('.summoner-level') || el.closest('.summoner-level-icon'))) return;
     let targets = Array.from(el.querySelectorAll(NAME_SELECTORS));
+    // Scan into open shadow roots (e.g. lol-parties-game-invite)
+    if (!targets.length) {
+        for (const child of el.querySelectorAll('*')) {
+            const sr = child.shadowRoot;
+            if (sr) {
+                targets.push(...sr.querySelectorAll(NAME_SELECTORS));
+                if (targets.length) break;
+            }
+        }
+    }
     if (!targets.length) {
         const tw = (el.ownerDocument || document).createTreeWalker(el, NodeFilter.SHOW_TEXT);
         let n;
         while ((n = tw.nextNode())) {
             if (n.nodeValue && n.nodeValue.trim()) {
+                if (n.parentElement && n.parentElement.closest('.summoner-level')) continue;
                 targets.push(n);
                 break;
             }
@@ -985,6 +1355,7 @@ function swapNameText(el, contextPuuid) {
     const isSelfCtx = contextPuuid === real.puuid;
 
     for (const target of targets) {
+        if (target.parentElement && target.parentElement.closest('.summoner-level')) continue;
         let cur = (target.textContent || '').replace(/[⁦-⁩‎‏]/g, '').trim();
         if (!cur) continue;
         if (cfg.enabled) {
@@ -992,7 +1363,23 @@ function swapNameText(el, contextPuuid) {
                 if (cur !== cfg.gameName) target.textContent = cfg.gameName;
                 continue;
             }
-            const alias = realToAlias[cur];
+            let alias = realToAlias[cur];
+            if (!alias && contextPuuid) {
+                alias = lookupFriend(contextPuuid, cur);
+            }
+            if (!alias && contextPuuid) {
+                const puuid = contextPuuid.split('@')[0];
+                if (friendPuuids.has(puuid)) {
+                    alias = friendLabel(puuid);
+                }
+            }
+            if (!alias && contextPuuid) {
+                const puuid = contextPuuid.split('@')[0];
+                if (!friendPuuids.has(puuid)) {
+                    alias = catLabel('global', 'puuid:' + puuid);
+                    noteFriend(cur, alias);
+                }
+            }
             if (alias && alias !== cur) { target.textContent = alias; continue; }
         } else {
             if (isSelfCtx) {
@@ -1036,6 +1423,7 @@ function installEmberHook() {
             callback(Ember, original, ...args) {
                 original(...args);
                 if (!this.element) return;
+                if (!cfg.enabled && !_hasSpoofedAnything) return;
                 trackComponent(this);
                 swapNameText(this.element, real.puuid);
                 if (!cfg.enabled && real.gameName) {
@@ -1099,6 +1487,7 @@ function installEmberHook() {
             callback(Ember, original, ...args) {
                 original(...args);
                 if (!this.element) return;
+                if (!cfg.enabled && !_hasSpoofedAnything) return;
                 trackComponent(this);
                 swapNameText(this.element, this.get && this.get('puuid'));
             }
@@ -1119,6 +1508,7 @@ function installEmberHook() {
             callback(Ember, original, ...args) {
                 original(...args);
                 if (!this.element) return;
+                if (!cfg.enabled && !_hasSpoofedAnything) return;
                 if (cfg.enabled && cfg.spoofFriends) {
                     trackComponent(this);
                     const el = this.element.querySelector('.player-name__game-name, .player-game-name, .name-text');
@@ -1147,6 +1537,7 @@ function installEmberHook() {
             callback(Ember, original, ...args) {
                 original(...args);
                 if (!this.element) return;
+                if (!cfg.enabled && !_hasSpoofedAnything) return;
                 if (cfg.enabled && cfg.spoofFriends) {
                     trackComponent(this);
                     const el = this.element.querySelector('.player-name__game-name, .player-game-name, .name-text');
@@ -1175,6 +1566,7 @@ function installEmberHook() {
             callback(Ember, original, ...args) {
                 original(...args);
                 if (!this.element) return;
+                if (!cfg.enabled && !_hasSpoofedAnything) return;
                 trackComponent(this);
                 swapNameText(this.element, this.get && (this.get('short') || this.get('puuid')));
             }
@@ -1215,8 +1607,10 @@ function installEmberHook() {
         } else if (cur !== cfg.gameName) {
             const cell = el.closest('.summoner-object');
             if (!cell) { logDebug('aliasPlayer', 'no summoner-object parent'); return; }
-            const label = catLabel('global', 'name:' + cur);
-            if (label === cur) { logDebug('aliasPlayer', 'label unchanged, skip'); return; }
+            // Check if known friend by looking up the cell's puuid context
+            const cellPuuid = el.getAttribute('data-puuid') || (cell && cell.getAttribute && cell.getAttribute('data-puuid'));
+            const label = resolveAlias(cur, cellPuuid);
+            if (!label || label === cur) { logDebug('aliasPlayer', 'label unchanged or null, skip'); return; }
             logDebug('aliasPlayer', 'other aliasing "' + cur + '" -> "' + label + '"');
             setTextNode(textEl, cur, label);
         }
@@ -1230,6 +1624,7 @@ function installEmberHook() {
         callback(Ember, original, ...args) {
                 original(...args);
                 if (!this.element) return;
+                if (!cfg.enabled && !_hasSpoofedAnything) return;
                 trackComponent(this);
                 swapNameText(this.element, this.get && this.get('puuid'));
             }
@@ -1250,6 +1645,7 @@ function installEmberHook() {
             callback(Ember, original, ...args) {
                 original(...args);
                 if (!this.element) return;
+                if (!cfg.enabled && !_hasSpoofedAnything) return;
                 trackComponent(this);
                 swapNameText(this.element, this.get && this.get('puuid'));
             }
@@ -1270,6 +1666,7 @@ function installEmberHook() {
             callback(Ember, original, ...args) {
                 original(...args);
                 if (!this.element) return;
+                if (!cfg.enabled && !_hasSpoofedAnything) return;
                 if (cfg.enabled && cfg.spoofFriends) {
                     trackComponent(this);
                     this.element.querySelectorAll('.v2-parties-invite-info-panel-player').forEach((li) => {
@@ -1282,10 +1679,14 @@ function installEmberHook() {
                         const [base] = catCfg(cat);
                         if (cur === base || cur.indexOf(base + ' ') === 0) return;
                         const sid = li.getAttribute('summonerid');
-                        const key = (sid && sid.length > 4) ? ('sid:' + sid) : ('name:' + cur);
-                        const label = catLabel(cat, key);
+                        let label;
+                        if (cat === 'friend') {
+                            label = registerFriend(cur, sid && sid.length > 4 ? ('sid:' + sid) : null);
+                        } else {
+                            const key = (sid && sid.length > 4) ? ('sid:' + sid) : ('name:' + cur);
+                            label = catLabel('global', key);
+                        }
                         if (cat === 'friend' && sid && sid.length > 4) friendPuuids.add('sid:' + sid);
-                        realToAlias[cur] = label;
                         el.textContent = label;
                         li.querySelectorAll('.player-name__tag-line').forEach((t) => { t.textContent = ''; });
                     });
@@ -1310,6 +1711,7 @@ function installEmberHook() {
             callback(Ember, original, ...args) {
                 original(...args);
                 if (!this.element) return;
+                if (!cfg.enabled && !_hasSpoofedAnything) return;
                 if (cfg.enabled && cfg.spoofFriends) {
                     trackComponent(this);
                     this.element.querySelectorAll('.invite-dialog-friend').forEach((li) => {
@@ -1348,6 +1750,7 @@ function installEmberHook() {
             callback(Ember, original, ...args) {
                 original(...args);
                 if (!this.element) return;
+                if (!cfg.enabled && !_hasSpoofedAnything) return;
                 trackComponent(this);
                 trackMhComponent(this);
                 logDebug('mh-hook', 'didRender element=' + (!!this.element) + ' real.gameName=' + (real.gameName || 'null'));
@@ -1418,6 +1821,7 @@ function installEmberHook() {
             callback(Ember, original, ...args) {
                 original(...args);
                 if (!this.element) return;
+                if (!cfg.enabled && !_hasSpoofedAnything) return;
                 const nameEl = this.element.querySelector('.member-name, .player-name__game-name, .player-game-name, .name-text, [class*="game-name"]');
                 if (!nameEl) { logDebug('hook', 'ns-roster-member no nameEl'); return; }
                 const cur = nameEl.textContent.replace(/[⁦-⁩‎‏]/g, '').trim();
@@ -1426,20 +1830,47 @@ function installEmberHook() {
                     if (cur && cur !== cfg.gameName) {
                         const [base] = catCfg('friend');
                         if (cur !== base && cur.indexOf(base + ' ') !== 0) {
-                            const label = catLabel('friend', 'name:' + cur);
-                            realToAlias[cur] = label;
+                            const p = typeof this.get === 'function' && this.get('puuid');
+                            let label = lookupFriend(p, cur);
+                            if (!label) label = registerFriend(cur, p);
                             nameEl.textContent = label;
                             logDebug('hook', 'ns-roster-member spoofed "' + cur + '" -> "' + label + '"');
+                            this.element.dataset.snoozeFriendName = cur;
+                        } else {
+                            const p = typeof this.get === 'function' && this.get('puuid');
+                            let realName = null;
+                            if (p) {
+                                const entry = friendRegistry.get('puuid:' + p);
+                                if (entry) realName = entry.realName;
+                            }
+                            if (!realName) {
+                                for (const [, entry] of friendRegistry) {
+                                    if (entry.spoofLabel === cur && entry.realName) {
+                                        realName = entry.realName;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (realName) {
+                                this.element.dataset.snoozeFriendName = realName;
+                            } else if (p) {
+                                this.element.dataset.snoozeFriendName = 'puuid:' + p;
+                            }
                         }
                     }
                 } else if (!cfg.enabled) {
-                    const realName = typeof this.get === 'function' && this.get('gameName');
+                    let realName = null;
+                    const p = typeof this.get === 'function' && this.get('puuid');
+                    if (p) {
+                        const entry = friendRegistry.get('puuid:' + p);
+                        if (entry) realName = entry.realName;
+                    }
+                    if (!realName) realName = typeof this.get === 'function' && this.get('gameName');
                     if (realName && cur !== realName) {
                         nameEl.textContent = realName;
                         logDebug('hook', 'ns-roster-member restored "' + cur + '" -> "' + realName + '"');
-                    } else {
-                        logDebug('hook', 'ns-roster-member skipped disabled cur="' + cur + '" real=' + (realName || 'none'));
                     }
+                    delete this.element.dataset.snoozeFriendName;
                 } else {
                     logDebug('hook', 'ns-roster-member skipped cfg.enabled=' + cfg.enabled + ' spoofFriends=' + cfg.spoofFriends);
                 }
@@ -1461,6 +1892,7 @@ function installEmberHook() {
             callback(Ember, original, ...args) {
                 original(...args);
                 if (!this.element) return;
+                if (!cfg.enabled && !_hasSpoofedAnything) return;
                 if (cfg.enabled && cfg.spoofFriends) {
                     trackComponent(this);
                     this.element.querySelectorAll('lol-uikit-player-name').forEach(el => {
@@ -1468,8 +1900,8 @@ function installEmberHook() {
                         if (!cur || cur === cfg.gameName) return;
                         const [base] = catCfg('friend');
                         if (cur === base || cur.indexOf(base + ' ') === 0) return;
-                        const label = catLabel('friend', 'name:' + cur);
-                        realToAlias[cur] = label;
+                        let label = lookupFriend(null, cur);
+                        if (!label) label = registerFriend(cur, null);
                         el.setAttribute('game-name', label);
                     });
                 } else if (!cfg.enabled) {
@@ -1566,7 +1998,13 @@ function installEmberHook() {
         // champ select
         'summoner-object', 'summoner-object-component',
         // match history detail
-        'match-details-scoreboard-component'
+        'match-details-scoreboard-component',
+        // parties: game invites / party status
+        'postgame-party-status', 'postgame-party-status-v2',
+        'parties-invite-dialog', 'parties-invite-info-panel', 'v2-parties-invite-info-panel',
+        'cherry-progression-lobby',
+        // parties: notification area where invite popups appear
+        'parties-footer-notifications', 'v2-footer-notifications', 'parties-notifications'
     ];
     for (const cls of _nameHooks) {
         _hookCleanups.push(Utils.Hooks.Ember.registerRule({
@@ -1577,6 +2015,7 @@ function installEmberHook() {
                 callback(Ember, original, ...args) {
                     original(...args);
                     if (!this.element) return;
+                if (!cfg.enabled && !_hasSpoofedAnything) return;
                     trackComponent(this);
                 swapNameText(this.element);
                 }
@@ -1601,6 +2040,7 @@ function installEmberHook() {
             callback(Ember, original, ...args) {
                 original(...args);
                 if (!this.element) return;
+                if (!cfg.enabled && !_hasSpoofedAnything) return;
                 trackComponent(this);
                 const model = this.get && (this.get('postgame') || this.get('model'));
                 const puuid = model && (model.localSummoner && model.localSummoner.puuid || model.player && model.player.puuid);
@@ -1623,14 +2063,22 @@ export function dispose() {
     DomScrubber.disconnectFrameObservers();
     stopTooltipObserver();
     stopChatObserver();
+    stopOverrideAttrObserver();
+    stopInviteObserver();
     for (const fn of _hookCleanups) try { fn(); } catch {}
     _hookCleanups.length = 0;
     for (const fn of _fetchCleanups) try { fn(); } catch {}
     _fetchCleanups.length = 0;
     _mhCtx = null;
+    // Rerender tracked components to restore original model data
+    for (const c of _emberComponents) { try { c.rerender(); } catch {} }
     _emberComponents.clear();
+    // Force full cleanup of realToAlias etc. after all rerenders
     for (const key of Object.keys(realToAlias)) delete realToAlias[key];
     friendPuuids.clear();
+    friendRegistry.clear();
+    friendCounter = 0;
+    _postgameNameIndex = 0;
     Object.keys(catMaps).forEach(k => delete catMaps[k]);
     Object.keys(catCount).forEach(k => { catCount[k] = 0; });
     _xhrRoutes.length = 0;
@@ -1661,6 +2109,7 @@ export function init(context) {
             if (!cfg.enabled) return;
             const p = e.data;
             if (p === 'Lobby' || p === 'Matchmaking' || p === 'ReadyCheck' || p === 'ChampSelect') {
+                _postgameNameIndex = 0;
                 Utils.LCU.get('/lol-gameflow/v1/session').then(s => {
                     const q = s && s.gameData && s.gameData.queue;
                     if (q) ctx.isRanked = !!q.isRanked || RANKED_QUEUES.has(q.id);
@@ -1781,7 +2230,10 @@ function buildSettings(c) {
 export function load() {
     assertXhr();
     if (!cfg.enabled) return;
+    DomScrubber.install();
     DomScrubber.sweep();
     installTooltipObserver();
     installChatObserver();
+    installOverrideAttrObserver();
+    installInviteObserver();
 }

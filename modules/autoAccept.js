@@ -10,6 +10,7 @@ import Utils from './generalUtils.js';
 const SETTINGS_KEY = 'enabled';
 const DELAY_KEY = 'delay';
 const EXIT_ON_DECLINE_KEY = 'exitOnDecline';
+const EXIT_ON_DODGE_KEY = 'exitOnDodge';
 const DELAY_MIN = 0;
 const DELAY_MAX = 10;
 
@@ -56,6 +57,12 @@ function renderExtraSettings(container, native = false) {
     const exitEnabled = Utils.Store.get('autoAccept', EXIT_ON_DECLINE_KEY) || false;
     container.appendChild(Utils.Settings.createToggleRow('Exit queue if someone declines', exitEnabled, (next) => {
         Utils.Store.set('autoAccept', EXIT_ON_DECLINE_KEY, next);
+    }));
+
+    // Exit on Dodge Toggle
+    const exitDodgeEnabled = Utils.Store.get('autoAccept', EXIT_ON_DODGE_KEY) || false;
+    container.appendChild(Utils.Settings.createToggleRow('Exit queue if someone dodges', exitDodgeEnabled, (next) => {
+        Utils.Store.set('autoAccept', EXIT_ON_DODGE_KEY, next);
     }));
 
     // Panic Key Hotkey
@@ -169,6 +176,18 @@ export function load() {
             if (e.data.state === 'StrangerNotReady' || e.data.state === 'PartyNotReady') {
                 Utils.Debug.log('[AutoAccept] Queue declined by someone. Exiting queue...');
                 Utils.LCU.delete('/lol-lobby/v2/lobby/matchmaking/search').catch(() => {});
+            }
+        });
+
+        Utils.LCU.observe('/lol-matchmaking/v1/notifications', e => {
+            if (!e.data || !Utils.Store.get('autoAccept', EXIT_ON_DODGE_KEY)) return;
+            const notifications = Array.isArray(e.data) ? e.data : [e.data];
+            for (const n of notifications) {
+                if (n.notificationReason === 'StrangerDodged') {
+                    Utils.Debug.log('[AutoAccept] Champ select dodged by Stranger. Exiting queue...');
+                    Utils.LCU.delete('/lol-lobby/v2/lobby/matchmaking/search').catch(() => {});
+                    break;
+                }
             }
         });
     }
