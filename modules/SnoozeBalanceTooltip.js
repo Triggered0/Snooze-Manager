@@ -20,12 +20,26 @@ let currentMode = null;
 let balanceData = {};
 let balancePhaseUnsub = null;
 
-const HOVER_COMPONENTS = [
-    { name: 'champion-bench-item', pos: 'bottom' },
-    { name: 'summoner-object', pos: 'right' },
-    { name: 'grid-champion', pos: 'bottom' },
-    { name: 'champion-card-component', pos: 'bottom' },
-    { name: 'champion-card-select-component', pos: 'bottom' }
+const HOVER_COMPONENTS = [{
+        name: 'champion-bench-item',
+        pos: 'bottom'
+    },
+    {
+        name: 'summoner-object',
+        pos: 'right'
+    },
+    {
+        name: 'grid-champion',
+        pos: 'bottom'
+    },
+    {
+        name: 'champion-card-component',
+        pos: 'bottom'
+    },
+    {
+        name: 'champion-card-select-component',
+        pos: 'bottom'
+    }
 ];
 
 function getModeKey(gameMode) {
@@ -88,35 +102,35 @@ function buildStatsHtml(stats) {
             entries.push([key, val]);
         }
     }
-    
+
     if (entries.length === 0) {
         return '<div style="color:#746e64;font-style:italic;font-size:12px;margin-top:4px;">No balance adjustments</div>';
     }
-    
+
     return entries.map(([key, value]) => {
-      const label = LABELS[key] ?? key;
-      const iconSvg = ICONS[key] || ICONS['dmg_dealt'];
-      
-      let isBuff = false;
-      let displayValue = '';
+        const label = LABELS[key] ?? key;
+        const iconSvg = ICONS[key] || ICONS['dmg_dealt'];
 
-      if (key === 'ability_haste') {
-          isBuff = value > 0;
-          displayValue = (value > 0 ? '+' : '') + value;
-      } else {
-          const percentChange = (value - 1.0) * 100;
-          if (key === 'dmg_taken') {
-              isBuff = value < 1.0;
-          } else {
-              isBuff = value > 1.0;
-          }
-          displayValue = (percentChange >= 0 ? '+' : '') + percentChange.toFixed(1) + '%';
-      }
+        let isBuff = false;
+        let displayValue = '';
 
-      const color = isBuff ? '#5bbd72' : '#e84749';
-      const icon = `<div style="width:18px; height:18px; margin-right:10px; display:inline-flex; align-items:center; opacity:0.9;">${iconSvg}</div>`;
-      
-      return `
+        if (key === 'ability_haste') {
+            isBuff = value > 0;
+            displayValue = (value > 0 ? '+' : '') + value;
+        } else {
+            const percentChange = (value - 1.0) * 100;
+            if (key === 'dmg_taken') {
+                isBuff = value < 1.0;
+            } else {
+                isBuff = value > 1.0;
+            }
+            displayValue = (percentChange >= 0 ? '+' : '') + percentChange.toFixed(1) + '%';
+        }
+
+        const color = isBuff ? '#5bbd72' : '#e84749';
+        const icon = `<div style="width:18px; height:18px; margin-right:10px; display:inline-flex; align-items:center; opacity:0.9;">${iconSvg}</div>`;
+
+        return `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; font-size:13px; color:#a09b8c;">
             <div style="display:flex; align-items:center;">
                 ${icon}
@@ -127,8 +141,10 @@ function buildStatsHtml(stats) {
     }).join('');
 }
 
-let ttRoot = null, ttCaption = null, ttContent = null;
-  
+let ttRoot = null,
+    ttCaption = null,
+    ttContent = null;
+
 function createCustomTooltip() {
     if (ttRoot) return;
     ttRoot = document.createElement('div');
@@ -161,8 +177,8 @@ function showTT(anchor, position, caption, html) {
     ttRoot.style.opacity = '1';
 }
 
-function hideTT() { 
-    if (ttRoot && ttRoot.style.opacity !== '0') ttRoot.style.opacity = '0'; 
+function hideTT() {
+    if (ttRoot && ttRoot.style.opacity !== '0') ttRoot.style.opacity = '0';
 }
 
 function showBalanceTooltip(component, position) {
@@ -170,18 +186,18 @@ function showBalanceTooltip(component, position) {
         hideTT();
         return;
     }
-    
+
     // Extract the champion ID directly from whichever Ember model is present
-    const champId = component.get('champion.id') 
-        || component.get('summoner.championId') 
-        || component.get('championConfiguration.champion.id') 
-        || component.get('championId');
-        
+    const champId = component.get('champion.id') ||
+        component.get('summoner.championId') ||
+        component.get('championConfiguration.champion.id') ||
+        component.get('championId');
+
     if (!champId) {
         hideTT();
         return;
     }
-    
+
     const stats = balanceData[champId]?.stats?.[currentMode] || {};
     showTT(component.element, position, `${currentMode.toUpperCase()} BALANCE`, buildStatsHtml(stats));
 }
@@ -266,7 +282,10 @@ async function fetchWikiData() {
                         }
                         if (statsEndIdx !== -1) {
                             const statsBlock = entryContent.substring(statsStartIdx, statsEndIdx);
-                            data[id] = { name, stats: parseStatsBlock(statsBlock) };
+                            data[id] = {
+                                name,
+                                stats: parseStatsBlock(statsBlock)
+                            };
                         }
                     }
                 }
@@ -346,7 +365,7 @@ export function init(context) {
                 callback(Ember, original, ...args) {
                     original(...args);
                     if (!this.element) return;
-                    
+
                     this.element.addEventListener('mouseenter', () => {
                         showBalanceTooltip(this, r.pos);
                     });
@@ -369,15 +388,13 @@ export function init(context) {
             id: 'SnoozeBalanceTooltip',
             name: 'Balance Tooltip',
             description: 'Hover over champions in special modes (ARAM/URF/Arena) to see balance info/nerfs natively.',
-            settings: [
-                {
-                    type: 'toggle',
-                    id: 'sm:SnoozeBalanceTooltip',
-                    label: 'Enable Balance Tooltip',
-                    value: isEnabled,
-                    onChange: (val) => toggleFeature(val)
-                }
-            ]
+            settings: [{
+                type: 'toggle',
+                id: 'sm:SnoozeBalanceTooltip',
+                label: 'Enable Balance Tooltip',
+                value: isEnabled,
+                onChange: (val) => toggleFeature(val)
+            }]
         });
     } else {
         Utils.DOM.observer.observe("lol-uikit-scrollable.balance-tooltip-settings", (plugin) => {

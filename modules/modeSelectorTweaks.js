@@ -52,21 +52,21 @@ function refreshCSS() {
     }
     ensureStyleElement();
     let css = '';
-    
+
     // Automatically hide config button if the game mode selector screen is hidden
     css += `.parties-view:has(.parties-game-select-screen.game-select-hide) #pm-mode-config-btn { display: none !important; }\n`;
-    
+
     hiddenNavs.forEach(nav => css += `lol-uikit-navigation-item[data-category="${nav}"] { display: none !important; }\n`);
     hiddenModes.forEach(mode => css += `div[data-game-mode="${mode}"] { display: none !important; }\n`);
     hiddenQueues.forEach(qId => css += `div.parties-game-type-card-category-div:has([data-queue-id="${qId}"]) { display: none !important; }\n`);
-    
+
     // hide the separator logic
     const leftHidden = hiddenNavs.has('kPvP') && hiddenNavs.has('kVersusAI') && hiddenNavs.has('kTraining');
     const rightHidden = hiddenNavs.has('CreateCustom') && hiddenNavs.has('JoinCustom');
     if (leftHidden || rightHidden) {
         css += `.parties-game-navs-break { display: none !important; }\n`;
     }
-    
+
     styleEl.textContent = css;
     if (EmberRef && partiesViewInstance) {
         EmberRef.run.scheduleOnce('afterRender', null, enforceValidSelection);
@@ -76,10 +76,10 @@ function refreshCSS() {
 function findComponentByElementId(view, id) {
     if (!view) return null;
     if (view.elementId === id) return view;
-    
+
     let children = view.childViews || [];
     if (typeof children.toArray === 'function') children = children.toArray();
-    
+
     for (let i = 0; i < children.length; i++) {
         const found = findComponentByElementId(children[i], id);
         if (found) return found;
@@ -90,36 +90,40 @@ function findComponentByElementId(view, id) {
 function enforceValidSelection() {
     if (!isEnabled || !partiesViewInstance || !EmberRef) return;
     if (partiesViewInstance.isDestroyed || partiesViewInstance.isDestroying) return;
-    
+
     const container = partiesViewInstance.element;
     if (!container) return;
-    
+
     const activeCard = container.querySelector('.game-type-card.selected');
     const isSelectedModeHidden = activeCard && hiddenModes.has(activeCard.getAttribute('data-game-mode'));
-    
+
     // 1. Enforce Valid Game Type Card (Mode fallback)
     if (isSelectedModeHidden || !activeCard) {
         const allCards = Array.from(container.querySelectorAll('.game-type-card'));
         const firstVisibleCard = allCards.find(card => !hiddenModes.has(card.getAttribute('data-game-mode')));
-        
+
         if (firstVisibleCard && partiesViewInstance) {
             const cardView = findComponentByElementId(partiesViewInstance, firstVisibleCard.id);
             if (cardView && typeof cardView.send === 'function') {
                 Utils.Debug.log('[ModeSelectorTweaks] Silently focusing valid mode via Ember:', firstVisibleCard.id);
-                
+
                 EmberRef.run(() => {
                     const origPlaySound = cardView.playSound;
                     if (origPlaySound) cardView.playSound = function() {};
-                    
+
                     const parent = cardView.get('parentView');
                     const origParentPlaySound = parent ? parent.playSound : null;
                     if (parent && typeof parent.playSound === 'function') {
                         parent.playSound = function() {};
                     }
-                    
-                    try { cardView.send('selectGameType'); } catch(e) {}
-                    try { cardView.send('selectQueue'); } catch(e) {}
-                    
+
+                    try {
+                        cardView.send('selectGameType');
+                    } catch (e) {}
+                    try {
+                        cardView.send('selectQueue');
+                    } catch (e) {}
+
                     if (origPlaySound) cardView.playSound = origPlaySound;
                     if (parent && origParentPlaySound) parent.playSound = origParentPlaySound;
                 });
@@ -127,7 +131,7 @@ function enforceValidSelection() {
                 const clickTarget = firstVisibleCard.querySelector('.parties-game-type-upper-half') || firstVisibleCard;
                 clickTarget.click();
             }
-            return; 
+            return;
         }
     }
 
@@ -144,29 +148,29 @@ function enforceValidSelection() {
             if (firstValidQueueEl) {
                 const queueView = findComponentByElementId(partiesViewInstance, firstValidQueueEl.id);
                 Utils.Debug.log('[ModeSelectorTweaks] Silently focusing valid queue via DOM Click + Mute:', firstValidQueueEl.id);
-                
+
                 EmberRef.run(() => {
                     let origPlaySound = null;
                     let parent = null;
                     let origParentPlaySound = null;
-                    
+
                     // Pre-mute the queue component to mask the switch
                     if (queueView) {
                         origPlaySound = queueView.playSound;
                         if (origPlaySound) queueView.playSound = function() {};
-                        
+
                         parent = queueView.get('parentView');
                         origParentPlaySound = parent && typeof parent.playSound === 'function' ? parent.playSound : null;
                         if (origParentPlaySound) {
                             parent.playSound = function() {};
                         }
                     }
-                    
+
                     // Native click invokes the proper parent action
                     const btn = firstValidQueueEl.querySelector('[data-queue-id]');
                     if (btn) btn.click();
                     else firstValidQueueEl.click();
-                    
+
                     // Restore sounds
                     if (queueView) {
                         if (origPlaySound) queueView.playSound = origPlaySound;
@@ -193,22 +197,22 @@ function loadConfig() {
 
 function injectButton() {
     if (!partiesViewInstance || !partiesViewInstance.element) return;
-    
+
     const partiesView = partiesViewInstance.element;
-    
+
     if (partiesView.querySelector('#pm-mode-config-btn')) return;
-    
+
     const existing = document.getElementById('pm-mode-config-btn');
     if (existing) existing.remove();
-    
+
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.id = 'pm-mode-config-btn';
     btn.title = 'Configure Mode Selector';
-    
+
     // SVG gear icon
     btn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`;
-    
+
     // Position relative to the parties-view
     btn.style.cssText = `
         position: absolute; right: 58px; top: 91px;
@@ -216,16 +220,22 @@ function injectButton() {
         padding: 4px; display: flex; justify-content: center; align-items: center;
         cursor: pointer; opacity: 0.7; transition: opacity 0.2s, color 0.2s;
     `;
-    
-    btn.onmouseenter = () => { btn.style.opacity = '1'; btn.style.color = '#f0e6d2'; };
-    btn.onmouseleave = () => { btn.style.opacity = '0.7'; btn.style.color = '#c8aa6e'; };
+
+    btn.onmouseenter = () => {
+        btn.style.opacity = '1';
+        btn.style.color = '#f0e6d2';
+    };
+    btn.onmouseleave = () => {
+        btn.style.opacity = '0.7';
+        btn.style.color = '#c8aa6e';
+    };
     btn.onclick = (e) => {
         e.preventDefault();
         e.stopPropagation();
         Utils.Debug.log('[ModeSelectorTweaks] Opening config modal');
         openConfigModal();
     };
-    
+
     partiesView.appendChild(btn);
 }
 
@@ -289,18 +299,18 @@ function openConfigModal() {
 
     function renderLists() {
         content.innerHTML = '';
-        
+
         // Scope to parties views
         const container = partiesViewInstance && partiesViewInstance.element ? partiesViewInstance.element : document;
-        
+
         const navs = [...container.querySelectorAll('lol-uikit-navigation-item[data-category]')].map(el => el.getAttribute('data-category'));
         const modes = [...container.querySelectorAll('.game-type-card')].map(el => el.getAttribute('data-game-mode'));
-        
+
         const queues = [];
         container.querySelectorAll('.game-type-card').forEach(card => {
             const modeStr = card.getAttribute('data-game-mode');
-            if (hiddenModes.has(modeStr)) return; 
-            
+            if (hiddenModes.has(modeStr)) return;
+
             card.querySelectorAll('.parties-game-type-card-category-btn[data-queue-id]').forEach(el => {
                 queues.push({
                     id: el.getAttribute('data-queue-id'),
@@ -311,12 +321,12 @@ function openConfigModal() {
 
         content.appendChild(createSection('Navigation Tabs', navs, hiddenNavs, '', '', null, getLabel));
         content.appendChild(createSection('Game Modes', modes, hiddenModes, '', '', renderLists, getLabel));
-        content.appendChild(createSection('Queues', queues, hiddenQueues, 'id', 'name', null, (label) => label)); 
+        content.appendChild(createSection('Queues', queues, hiddenQueues, 'id', 'name', null, (label) => label));
     }
 
     function createSection(titleText, items, hiddenSet, idKey, labelKey, onToggleCallback, labelFormatter) {
         const sec = document.createElement('div');
-        
+
         const h3 = document.createElement('div');
         h3.className = 'pm-section-title';
         h3.textContent = titleText;
@@ -330,7 +340,10 @@ function openConfigModal() {
         const seen = new Set();
         items.forEach(item => {
             const id = typeof item === 'object' ? item[idKey] : item;
-            if (id && !seen.has(id)) { seen.add(id); uniqueItems.push(item); }
+            if (id && !seen.has(id)) {
+                seen.add(id);
+                uniqueItems.push(item);
+            }
         });
 
         const colCount = uniqueItems.length <= 4 ? 2 : (uniqueItems.length <= 6 ? 3 : 4);
@@ -339,8 +352,8 @@ function openConfigModal() {
         uniqueItems.forEach(item => {
             const id = typeof item === 'object' ? item[idKey] : item;
             const rawLabel = typeof item === 'object' ? item[labelKey] : item;
-            const cleanLabel = labelFormatter(rawLabel); 
-            
+            const cleanLabel = labelFormatter(rawLabel);
+
             const row = document.createElement('div');
             row.className = 'pm-row';
 
@@ -357,17 +370,20 @@ function openConfigModal() {
             toggleBtn.className = 'pm-toggle-btn ' + (isVisible ? 'on' : 'off');
 
             const toggleFn = (e) => {
-                if (e) { e.preventDefault(); e.stopPropagation(); }
+                if (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
                 const v = !toggleBtn.classList.contains('on');
-                
+
                 if (v) hiddenSet.delete(id);
                 else hiddenSet.add(id);
-                
+
                 toggleBtn.className = 'pm-toggle-btn ' + (v ? 'on' : 'off');
-                
+
                 saveConfig();
-                refreshCSS(); 
-                if (onToggleCallback) onToggleCallback(); 
+                refreshCSS();
+                if (onToggleCallback) onToggleCallback();
             };
 
             toggleBtn.onclick = toggleFn;
@@ -383,7 +399,7 @@ function openConfigModal() {
     renderLists();
 
     overlay.appendChild(modal);
-    
+
     const viewportOverlay = document.querySelector('.rcp-fe-viewport-overlay');
     if (viewportOverlay && viewportOverlay.parentNode === document.body) viewportOverlay.after(overlay);
     else document.body.appendChild(overlay);
@@ -393,7 +409,7 @@ function toggleFeature(enabled) {
     isEnabled = enabled;
     Utils.Store.set('modeSelectorTweaks', 'enabled', enabled);
     Utils.Debug.log('[ModeSelectorTweaks] Feature ' + (enabled ? 'enabled' : 'disabled'));
-    
+
     if (enabled) {
         refreshCSS();
         injectButton();
@@ -410,7 +426,7 @@ let partiesViewInstance = null;
 export function installEmberHook() {
     if (emberHookRegistered) return;
     emberHookRegistered = true;
-    
+
     Utils.Hooks.Ember.registerRule({
         name: 'mode-selector-tweaks-hook',
         matcher: 'parties-view',
@@ -435,9 +451,9 @@ export function installEmberHook() {
                 didRender() {
                     partiesViewInstance = this;
                     this._super(...arguments);
-                    
+
                     if (!isEnabled) return;
-                    
+
                     refreshCSS();
                     injectButton();
                     Ember.run.scheduleOnce('afterRender', null, enforceValidSelection);

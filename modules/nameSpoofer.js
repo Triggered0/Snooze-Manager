@@ -14,15 +14,17 @@ let _hasSpoofedAnything = false;
 
 // In-memory mirror of the persisted config (read on every hook, so keep it hot).
 const cfg = {
-    enabled: false,         // global master switch (turns ALL spoofing on/off)
-    spoofSelf: true,       // spoof my own name
+    enabled: false, // global master switch (turns ALL spoofing on/off)
+    spoofSelf: true, // spoof my own name
     gameName: 'Name Spoofer',
     tagLine: 'Pengu',
-    friendName: 'Friend', friendNumbers: true,
-    globalName: 'Player', globalNumbers: true,
+    friendName: 'Friend',
+    friendNumbers: true,
+    globalName: 'Player',
+    globalNumbers: true,
     spoofFriends: false,
     spoofLobby: false,
-    spoofChampSelect: false,   // non-ranked only
+    spoofChampSelect: false, // non-ranked only
     spoofMatchHistory: false
 };
 
@@ -36,7 +38,10 @@ const real = {
 };
 
 // Live gameflow context, updated via LCU WebSocket observe.
-const ctx = { phase: 'None', isRanked: false };
+const ctx = {
+    phase: 'None',
+    isRanked: false
+};
 
 // Fallback when gameData.queue.isRanked is absent.
 const RANKED_QUEUES = new Set([420, 440]);
@@ -51,6 +56,7 @@ function catCfg(category) {
 // With "Include Numbers" off for the category, returns just "<Base>".
 const catMaps = {};
 const catCount = {};
+
 function catLabel(category, key) {
     const [base, useNum] = catCfg(category);
     if (!useNum || !key) return base;
@@ -64,31 +70,60 @@ function catLabel(category, key) {
 const friendPuuids = new Set();
 const friendRegistry = new Map(); // key='puuid:<uuid>' or 'name:<name>' → {spoofLabel, realName}
 let friendCounter = 0;
+
 function friendLabel(key) {
     if (key) friendPuuids.add(key);
     if (key && friendRegistry.has('puuid:' + key)) return friendRegistry.get('puuid:' + key).spoofLabel;
     return registerFriend(null, key);
 }
+
 function registerFriend(realName, puuid) {
     if (puuid) {
         const k = 'puuid:' + puuid;
-        if (friendRegistry.has(k)) { const e = friendRegistry.get(k); if (realName) realToAlias[realName] = e.spoofLabel; return e.spoofLabel; }
+        if (friendRegistry.has(k)) {
+            const e = friendRegistry.get(k);
+            if (realName) realToAlias[realName] = e.spoofLabel;
+            return e.spoofLabel;
+        }
     }
     if (realName) {
         const k = 'name:' + realName;
-        if (friendRegistry.has(k)) { const e = friendRegistry.get(k); if (puuid) { friendPuuids.add(puuid); friendRegistry.set('puuid:' + puuid, e); } return e.spoofLabel; }
+        if (friendRegistry.has(k)) {
+            const e = friendRegistry.get(k);
+            if (puuid) {
+                friendPuuids.add(puuid);
+                friendRegistry.set('puuid:' + puuid, e);
+            }
+            return e.spoofLabel;
+        }
     }
     const [base, useNum] = catCfg('friend');
     friendCounter++;
     const label = useNum ? (base + ' ' + friendCounter) : base;
-    const entry = { spoofLabel: label, realName };
-    if (puuid) { friendPuuids.add(puuid); friendRegistry.set('puuid:' + puuid, entry); }
-    if (realName) { friendRegistry.set('name:' + realName, entry); realToAlias[realName] = label; }
+    const entry = {
+        spoofLabel: label,
+        realName
+    };
+    if (puuid) {
+        friendPuuids.add(puuid);
+        friendRegistry.set('puuid:' + puuid, entry);
+    }
+    if (realName) {
+        friendRegistry.set('name:' + realName, entry);
+        realToAlias[realName] = label;
+    }
     return label;
 }
+
 function lookupFriend(puuid, nameText) {
-    if (puuid) { const e = friendRegistry.get('puuid:' + puuid.split('@')[0]); if (e) return e.spoofLabel; }
-    if (nameText) { const e = friendRegistry.get('name:' + nameText); if (e) return e.spoofLabel; }
+    if (puuid) {
+        const e = friendRegistry.get('puuid:' + puuid.split('@')[0]);
+        if (e) return e.spoofLabel;
+    }
+    if (nameText) {
+        const e = friendRegistry.get('name:' + nameText);
+        if (e) return e.spoofLabel;
+    }
     return null;
 }
 
@@ -105,12 +140,15 @@ let _postgameNameIndex = 0;
 
 // Real name -> alias capture, so the DOM scrubber can fix cached renders (hovercard).
 const realToAlias = {};
+
 function noteFriend(realName, label) {
     if (realName && label && realName !== label) {
         const clean = realName.replace(/[⁦-⁩‎‏]/g, '');
         if (clean === label) return;
         // Prevent alias-to-alias entries: don't register an alias as a real name
-        for (const v of Object.values(realToAlias)) { if (v === clean) return; }
+        for (const v of Object.values(realToAlias)) {
+            if (v === clean) return;
+        }
         realToAlias[clean] = label;
     }
 }
@@ -118,19 +156,33 @@ function noteFriend(realName, label) {
 // Per-match-history context for component-data fallback (cached entries that
 // don't trigger XHR). Reset on every match-history request.
 let _mhCtx = null;
+
 function _mhCtxGet() {
-    if (!_mhCtx) _mhCtx = { selfTeamId: null, otherN: 0 };
+    if (!_mhCtx) _mhCtx = {
+        selfTeamId: null,
+        otherN: 0
+    };
     return _mhCtx;
 }
+
 function _mhAliasFromComponent(comp) {
     let part, player;
     try {
         part = comp.get ? comp.get('participant') : comp.participant;
         player = part && (part.player || part);
-    } catch { logDebug('mh-alias', 'catch'); return null; }
-    if (!player) { logDebug('mh-alias', 'null player'); return null; }
+    } catch {
+        logDebug('mh-alias', 'catch');
+        return null;
+    }
+    if (!player) {
+        logDebug('mh-alias', 'null player');
+        return null;
+    }
     const pName = nameOf(player);
-    if (!pName) { logDebug('mh-alias', 'null pName'); return null; }
+    if (!pName) {
+        logDebug('mh-alias', 'null pName');
+        return null;
+    }
     const pPuuid = puuidOf(player);
     const ctx = _mhCtxGet();
     const pTeamId = part ? (part.teamId || player.teamId) : player.teamId;
@@ -143,7 +195,9 @@ function _mhAliasFromComponent(comp) {
                 const snapshot = [..._emberComponents];
                 for (const c of snapshot) {
                     if (c !== comp && c.element && c.element.classList.contains('player-history-object')) {
-                        try { c.rerender(); } catch {}
+                        try {
+                            c.rerender();
+                        } catch {}
                     }
                 }
             });
@@ -178,13 +232,24 @@ const _emberComponents = new Set();
 const _hookCleanups = []; // cleanup functions returned by registerRule, called by dispose()
 const _partyComponents = new Set();
 const _mhComponents = new Set(); // match-history components, processed when identity arrives
-function trackComponent(c) { if (c && c.element && c.rerender) _emberComponents.add(c); }
-function trackMhComponent(c) { if (c && c.element) _mhComponents.add(c); }
-function untrackComponent(c) { if (c) _emberComponents.delete(c); }
+function trackComponent(c) {
+    if (c && c.element && c.rerender) _emberComponents.add(c);
+}
+
+function trackMhComponent(c) {
+    if (c && c.element) _mhComponents.add(c);
+}
+
+function untrackComponent(c) {
+    if (c) _emberComponents.delete(c);
+}
+
 function rerenderTracked() {
     logDebug('rerender', 'rerendering ' + _emberComponents.size + ' tracked components');
     for (const c of _emberComponents) {
-        try { c.rerender(); } catch {}
+        try {
+            c.rerender();
+        } catch {}
     }
     _emberComponents.clear();
 }
@@ -192,7 +257,11 @@ function rerenderTracked() {
 function triggerRosterRebuild() {
     const provider = _emberProvider || window.__SM_EMBER;
     logDebug('roster', 'triggerRosterRebuild provider=' + (provider ? 'yes' : 'no') + ' __SM_EMBER=' + (window.__SM_EMBER ? 'yes' : 'no'));
-    if (!provider) { logDebug('roster', 'no provider -> rerenderTracked'); rerenderTracked(); return; }
+    if (!provider) {
+        logDebug('roster', 'no provider -> rerenderTracked');
+        rerenderTracked();
+        return;
+    }
     provider.getEmber().then(Ember => {
         logDebug('roster', 'got Ember, searching namespaces...');
         let hadFriendGroups = false;
@@ -220,14 +289,20 @@ function triggerRosterRebuild() {
             rerenderTracked();
         }
         rerenderTracked();
-    }).catch((e) => { Utils.Debug.warn('[NameSpoofer] getEmber failed:', e); rerenderTracked(); });
+    }).catch((e) => {
+        Utils.Debug.warn('[NameSpoofer] getEmber failed:', e);
+        rerenderTracked();
+    });
 }
 
 
 
 // Match data often anonymizes puuids to all-zeros, so the alias key falls back to name.
 const ZERO_PUUID = '00000000-0000-0000-0000-000000000000';
-function validPuuid(p) { return p && p !== ZERO_PUUID; }
+
+function validPuuid(p) {
+    return p && p !== ZERO_PUUID;
+}
 
 // Endpoints whose response root is us -> rewrite unconditionally (incl. `name`).
 const ME_ENDPOINTS = [
@@ -313,7 +388,8 @@ function applyName(obj, allowName, gameName, tagLine) {
     if (!obj || typeof obj !== 'object') return;
     if (gameName) {
         for (const k of ['gameName', 'displayName', 'summonerName', 'internalName',
-                         'summonerInternalName', 'riotIdGameName']) {
+                'summonerInternalName', 'riotIdGameName'
+            ]) {
             if (k in obj) obj[k] = gameName;
         }
         if (allowName && 'name' in obj && typeof obj.name === 'string') obj.name = gameName;
@@ -337,27 +413,39 @@ function puuidOf(o) {
     if (validPuuid(o.puuid)) return o.puuid;
     for (const k of ['id', 'pid']) {
         const v = o[k];
-        if (typeof v === 'string') { const p = v.split('@')[0]; if (validPuuid(p)) return p; }
+        if (typeof v === 'string') {
+            const p = v.split('@')[0];
+            if (validPuuid(p)) return p;
+        }
     }
     return null;
 }
 
 function isSelf(o, nm) {
     nm = nm || nameOf(o);
-    return (validPuuid(o.puuid) && o.puuid === real.puuid)
-        || (real.gameName && nm === real.gameName)
-        || (cfg.gameName && nm === cfg.gameName);
+    return (validPuuid(o.puuid) && o.puuid === real.puuid) ||
+        (real.gameName && nm === real.gameName) ||
+        (cfg.gameName && nm === cfg.gameName);
 }
 
 function spoofSelf(node, isMeRoot) {
-    if (Array.isArray(node)) { for (const n of node) spoofSelf(n, false); return; }
+    if (Array.isArray(node)) {
+        for (const n of node) spoofSelf(n, false);
+        return;
+    }
     if (!node || typeof node !== 'object') return;
     if (isMeRoot || isSelf(node)) applyName(node, isMeRoot, cfg.gameName, cfg.tagLine);
-    for (const k in node) { const v = node[k]; if (v && typeof v === 'object') spoofSelf(v, false); }
+    for (const k in node) {
+        const v = node[k];
+        if (v && typeof v === 'object') spoofSelf(v, false);
+    }
 }
 
 function aliasConversations(data, selfOn) {
-    if (Array.isArray(data)) { for (const n of data) aliasConversations(n, selfOn); return; }
+    if (Array.isArray(data)) {
+        for (const n of data) aliasConversations(n, selfOn);
+        return;
+    }
     if (!data || typeof data !== 'object') return;
     if (isSelf(data)) {
         if (selfOn) applyName(data, true, cfg.gameName, cfg.tagLine);
@@ -376,27 +464,44 @@ function aliasConversations(data, selfOn) {
             applyName(data, true, l, '');
         }
     }
-    for (const k in data) { const v = data[k]; if (v && typeof v === 'object') aliasConversations(v, selfOn); }
+    for (const k in data) {
+        const v = data[k];
+        if (v && typeof v === 'object') aliasConversations(v, selfOn);
+    }
 }
 
 function spoofSelfAndFriends(node, isMeRoot, selfOn) {
-    if (Array.isArray(node)) { for (const n of node) spoofSelfAndFriends(n, false, selfOn); return; }
+    if (Array.isArray(node)) {
+        for (const n of node) spoofSelfAndFriends(n, false, selfOn);
+        return;
+    }
     if (!node || typeof node !== 'object') return;
     if (isMeRoot || isSelf(node)) {
         if (selfOn) applyName(node, true, cfg.gameName, cfg.tagLine);
     } else if (cfg.spoofFriends && hasNameField(node)) {
         const pu = puuidOf(node);
-        if (pu && friendPuuids.has(pu)) { const l = friendLabel(pu); noteFriend(nameOf(node), l); applyName(node, true, l, ''); }
+        if (pu && friendPuuids.has(pu)) {
+            const l = friendLabel(pu);
+            noteFriend(nameOf(node), l);
+            applyName(node, true, l, '');
+        }
     }
-    for (const k in node) { const v = node[k]; if (v && typeof v === 'object') spoofSelfAndFriends(v, false, selfOn); }
+    for (const k in node) {
+        const v = node[k];
+        if (v && typeof v === 'object') spoofSelfAndFriends(v, false, selfOn);
+    }
 }
 
 function aliasFriendsList(node, selfOn, category) {
-    if (Array.isArray(node)) { for (const n of node) aliasFriendsList(n, selfOn, category); return; }
+    if (Array.isArray(node)) {
+        for (const n of node) aliasFriendsList(n, selfOn, category);
+        return;
+    }
     if (!node || typeof node !== 'object') return;
     if (hasNameField(node)) {
-        if (isSelf(node)) { if (selfOn) applyName(node, true, cfg.gameName, cfg.tagLine); }
-        else {
+        if (isSelf(node)) {
+            if (selfOn) applyName(node, true, cfg.gameName, cfg.tagLine);
+        } else {
             const pu = puuidOf(node);
             const key = pu || (node.summonerId && ('sid:' + node.summonerId)) || nameOf(node);
             if (key) {
@@ -414,7 +519,10 @@ function aliasFriendsList(node, selfOn, category) {
             }
         }
     }
-    for (const k in node) { const v = node[k]; if (v && typeof v === 'object') aliasFriendsList(v, selfOn, category); }
+    for (const k in node) {
+        const v = node[k];
+        if (v && typeof v === 'object') aliasFriendsList(v, selfOn, category);
+    }
 }
 
 async function syncFriends() {
@@ -456,7 +564,10 @@ function resolveAlias(nm, pu, counters) {
 
 function applyOther(o, counters, selfOn, readOnly) {
     if (!o || typeof o !== 'object') return;
-    if (isSelf(o)) { if (selfOn && !readOnly) applyName(o, true, cfg.gameName, cfg.tagLine); return; }
+    if (isSelf(o)) {
+        if (selfOn && !readOnly) applyName(o, true, cfg.gameName, cfg.tagLine);
+        return;
+    }
     const nm = nameOf(o);
     if (!nm) return;
     const pu = puuidOf(o);
@@ -467,24 +578,34 @@ function applyOther(o, counters, selfOn, readOnly) {
 }
 
 function aliasTeam(node, selfOn, readOnly) {
-    if (Array.isArray(node)) { for (const n of node) aliasTeam(n, selfOn, readOnly); return; }
+    if (Array.isArray(node)) {
+        for (const n of node) aliasTeam(n, selfOn, readOnly);
+        return;
+    }
     if (!node || typeof node !== 'object') return;
     if (Array.isArray(node.participantIdentities) && Array.isArray(node.participants)) {
-        aliasLcuGame(node, selfOn, readOnly); return;
+        aliasLcuGame(node, selfOn, readOnly);
+        return;
     }
     if (Array.isArray(node.teams) && node.teams[0] && Array.isArray(node.teams[0].players)) {
-        aliasEogTeams(node, selfOn, readOnly); return;
+        aliasEogTeams(node, selfOn, readOnly);
+        return;
     }
     if (Array.isArray(node.participants) && node.participants[0] && hasNameField(node.participants[0])) {
-        aliasFlatParticipants(node.participants, selfOn, readOnly); return;
+        aliasFlatParticipants(node.participants, selfOn, readOnly);
+        return;
     }
     if (Array.isArray(node.eligiblePlayers) || Array.isArray(node.eligibleAllies) || Array.isArray(node.eligibleOpponents)) {
         const c = {};
         const allOthers = [...(node.eligibleAllies || node.eligiblePlayers || []), ...(node.eligibleOpponents || [])];
-        for (const p of allOthers) if (p && hasNameField(p)) applyOther(p, c, selfOn, readOnly);
+        for (const p of allOthers)
+            if (p && hasNameField(p)) applyOther(p, c, selfOn, readOnly);
         return;
     }
-    for (const k in node) { const v = node[k]; if (v && typeof v === 'object') aliasTeam(v, selfOn, readOnly); }
+    for (const k in node) {
+        const v = node[k];
+        if (v && typeof v === 'object') aliasTeam(v, selfOn, readOnly);
+    }
 }
 
 function aliasLcuGame(game, selfOn, readOnly) {
@@ -525,15 +646,25 @@ function transformObject(data, opts) {
 function transformText(text, opts) {
     if (!text || !needsWork(opts)) return text;
     let data;
-    try { data = JSON.parse(text); } catch { return text; }
-    try { transformObject(data, opts); return opts.collectOnly ? text : JSON.stringify(data); }
-    catch (e) { Utils.Debug.warn('[NameSpoofer] transform failed:', e); return text; }
+    try {
+        data = JSON.parse(text);
+    } catch {
+        return text;
+    }
+    try {
+        transformObject(data, opts);
+        return opts.collectOnly ? text : JSON.stringify(data);
+    } catch (e) {
+        Utils.Debug.warn('[NameSpoofer] transform failed:', e);
+        return text;
+    }
 }
 
 let _xhrInstalled = false;
 let _xhrFallbackUsed = false;
 let _xhrRespGet, _xhrTextGet;
 const _xhrRoutes = [];
+
 function assertXhr() {
     const proto = XMLHttpRequest.prototype;
     if (proto.open && proto.open._nsHook) return;
@@ -549,22 +680,34 @@ function assertXhr() {
         _xhrTextGet = textDesc.get;
     }
     const prevOpen = proto.open;
-    const respGet = _xhrRespGet, textGet = _xhrTextGet;
-    const nsOpen = function (m, u, ...rest) {
+    const respGet = _xhrRespGet,
+        textGet = _xhrTextGet;
+    const nsOpen = function(m, u, ...rest) {
         if (!cfg.enabled) return prevOpen.call(this, m, u, ...rest);
         const url = String(u);
         const route = _xhrRoutes.find((rt) => url.indexOf(rt.pattern) !== -1);
         if (route) {
             const opts = route.optsFn;
-            let objDone = false, textCache;
+            let objDone = false,
+                textCache;
             try {
                 Object.defineProperty(this, 'response', {
                     configurable: true,
                     get() {
-                        let raw; try { raw = respGet.call(this); } catch { return undefined; }
+                        let raw;
+                        try {
+                            raw = respGet.call(this);
+                        } catch {
+                            return undefined;
+                        }
                         if (this.readyState !== 4 || !needsWork(opts())) return raw;
                         if (raw && typeof raw === 'object') {
-                            if (!objDone) { try { transformObject(raw, opts()); } catch {} objDone = true; }
+                            if (!objDone) {
+                                try {
+                                    transformObject(raw, opts());
+                                } catch {}
+                                objDone = true;
+                            }
                             return raw;
                         }
                         if (typeof raw === 'string') {
@@ -577,7 +720,12 @@ function assertXhr() {
                 Object.defineProperty(this, 'responseText', {
                     configurable: true,
                     get() {
-                        let raw; try { raw = textGet.call(this); } catch { return ''; }
+                        let raw;
+                        try {
+                            raw = textGet.call(this);
+                        } catch {
+                            return '';
+                        }
                         if (this.readyState !== 4 || typeof raw !== 'string' || !raw || !needsWork(opts())) return raw;
                         if (textCache === undefined) textCache = transformText(raw, opts());
                         return textCache;
@@ -590,22 +738,52 @@ function assertXhr() {
     nsOpen._nsHook = true;
     proto.open = nsOpen;
 }
+
 function installXhrFallback() {
     if (_xhrFallbackUsed) return;
     _xhrFallbackUsed = true;
     const reg = (pattern, optsFn) => {
         Utils.Hooks.Xhr.hookRes(pattern, (...args) => transformText(args[3], optsFn()));
     };
-    reg('/lol-match-history/v1/recently-played-summoners', () => ({ others: cfg.spoofFriends ? 'globalList' : false }));
-    reg('/lol-summoner/v1/summoners/aliases', () => ({ others: cfg.spoofFriends ? 'friendsList' : false }));
-    for (const ep of ME_ENDPOINTS) reg(ep, () => ({ isMeRoot: true, others: false }));
-    for (const ep of GENERIC_ENDPOINTS) reg(ep, () => ({ isMeRoot: false, others: false }));
-    reg('/lol-chat/v1/conversations', () => ({ isMeRoot: false, others: 'conversations' }));
-    reg('/lol-chat/v1/friends', () => ({ isMeRoot: false, others: cfg.spoofFriends ? 'friendsList' : false }));
-    for (const ep of MATCH_HISTORY_ENDPOINTS) reg(ep, () => { _mhCtx = null; return { others: 'team', collectOnly: true }; });
-    for (const ep of POST_GAME_ENDPOINTS) reg(ep, () => ({ others: 'team', collectOnly: true }));
-    for (const ep of CHAMPSELECT_ENDPOINTS) reg(ep, () => ({ isMeRoot: false, others: 'conversations' }));
+    reg('/lol-match-history/v1/recently-played-summoners', () => ({
+        others: cfg.spoofFriends ? 'globalList' : false
+    }));
+    reg('/lol-summoner/v1/summoners/aliases', () => ({
+        others: cfg.spoofFriends ? 'friendsList' : false
+    }));
+    for (const ep of ME_ENDPOINTS) reg(ep, () => ({
+        isMeRoot: true,
+        others: false
+    }));
+    for (const ep of GENERIC_ENDPOINTS) reg(ep, () => ({
+        isMeRoot: false,
+        others: false
+    }));
+    reg('/lol-chat/v1/conversations', () => ({
+        isMeRoot: false,
+        others: 'conversations'
+    }));
+    reg('/lol-chat/v1/friends', () => ({
+        isMeRoot: false,
+        others: cfg.spoofFriends ? 'friendsList' : false
+    }));
+    for (const ep of MATCH_HISTORY_ENDPOINTS) reg(ep, () => {
+        _mhCtx = null;
+        return {
+            others: 'team',
+            collectOnly: true
+        };
+    });
+    for (const ep of POST_GAME_ENDPOINTS) reg(ep, () => ({
+        others: 'team',
+        collectOnly: true
+    }));
+    for (const ep of CHAMPSELECT_ENDPOINTS) reg(ep, () => ({
+        isMeRoot: false,
+        others: 'conversations'
+    }));
 }
+
 function installXhr() {
     if (_xhrInstalled) return;
     _xhrInstalled = true;
@@ -614,6 +792,7 @@ function installXhr() {
 
 let _hooksInstalled = false;
 const _fetchCleanups = [];
+
 function installHooks(context) {
     if (_hooksInstalled) return;
     _hooksInstalled = true;
@@ -621,28 +800,75 @@ function installHooks(context) {
 
     const reg = (pattern, optsFn) => {
         _fetchCleanups.push(Utils.Hooks.Fetch.hookRes(pattern, (text) => transformText(text, optsFn())));
-        _xhrRoutes.push({ pattern, optsFn });
+        _xhrRoutes.push({
+            pattern,
+            optsFn
+        });
     };
 
-    reg('/lol-match-history/v1/recently-played-summoners', () => ({ others: cfg.spoofFriends ? 'globalList' : false }));
-    reg('/lol-summoner/v1/summoners/aliases', () => ({ others: cfg.spoofFriends ? 'friendsList' : false }));
+    reg('/lol-match-history/v1/recently-played-summoners', () => ({
+        others: cfg.spoofFriends ? 'globalList' : false
+    }));
+    reg('/lol-summoner/v1/summoners/aliases', () => ({
+        others: cfg.spoofFriends ? 'friendsList' : false
+    }));
 
-    for (const ep of ME_ENDPOINTS) reg(ep, () => ({ isMeRoot: true, others: false }));
-    for (const ep of GENERIC_ENDPOINTS) reg(ep, () => ({ isMeRoot: false, others: false }));
-    for (const ep of MATCH_HISTORY_ENDPOINTS) reg(ep, () => { _mhCtx = null; return { others: 'team', collectOnly: true }; });
-    for (const ep of POST_GAME_ENDPOINTS) reg(ep, () => ({ others: 'team', collectOnly: true }));
-    for (const ep of CHAMPSELECT_ENDPOINTS) reg(ep, () => ({ isMeRoot: false, others: 'conversations' }));
+    for (const ep of ME_ENDPOINTS) reg(ep, () => ({
+        isMeRoot: true,
+        others: false
+    }));
+    for (const ep of GENERIC_ENDPOINTS) reg(ep, () => ({
+        isMeRoot: false,
+        others: false
+    }));
+    for (const ep of MATCH_HISTORY_ENDPOINTS) reg(ep, () => {
+        _mhCtx = null;
+        return {
+            others: 'team',
+            collectOnly: true
+        };
+    });
+    for (const ep of POST_GAME_ENDPOINTS) reg(ep, () => ({
+        others: 'team',
+        collectOnly: true
+    }));
+    for (const ep of CHAMPSELECT_ENDPOINTS) reg(ep, () => ({
+        isMeRoot: false,
+        others: 'conversations'
+    }));
 
-    _fetchCleanups.push(Utils.Hooks.Fetch.hookRes('/lol-chat/v1/conversations', (text) => transformText(text, { isMeRoot: false, others: 'conversations' })));
-    _xhrRoutes.unshift({ pattern: '/lol-chat/v1/conversations', optsFn: () => ({ isMeRoot: false, others: 'conversations' }) });
-    _fetchCleanups.push(Utils.Hooks.Fetch.hookRes('/lol-chat/v1/friends', (text) => transformText(text, { isMeRoot: false, others: cfg.spoofFriends ? 'friendsList' : false })));
-    _xhrRoutes.unshift({ pattern: '/lol-chat/v1/friends', optsFn: () => ({ isMeRoot: false, others: cfg.spoofFriends ? 'friendsList' : false }) });
+    _fetchCleanups.push(Utils.Hooks.Fetch.hookRes('/lol-chat/v1/conversations', (text) => transformText(text, {
+        isMeRoot: false,
+        others: 'conversations'
+    })));
+    _xhrRoutes.unshift({
+        pattern: '/lol-chat/v1/conversations',
+        optsFn: () => ({
+            isMeRoot: false,
+            others: 'conversations'
+        })
+    });
+    _fetchCleanups.push(Utils.Hooks.Fetch.hookRes('/lol-chat/v1/friends', (text) => transformText(text, {
+        isMeRoot: false,
+        others: cfg.spoofFriends ? 'friendsList' : false
+    })));
+    _xhrRoutes.unshift({
+        pattern: '/lol-chat/v1/friends',
+        optsFn: () => ({
+            isMeRoot: false,
+            others: cfg.spoofFriends ? 'friendsList' : false
+        })
+    });
 
     Utils.Hooks.WS.install(context);
     for (const ep of ME_WS) {
         Utils.Hooks.WS.hook(ep, (_endpoint, payload) => {
             if (!active() || !payload || typeof payload !== 'object') return payload;
-            try { spoofSelf(payload, true); } catch (e) { Utils.Debug.warn('[NameSpoofer] WS transform failed:', e); }
+            try {
+                spoofSelf(payload, true);
+            } catch (e) {
+                Utils.Debug.warn('[NameSpoofer] WS transform failed:', e);
+            }
             return payload;
         });
     }
@@ -669,7 +895,9 @@ function installHooks(context) {
                     }
                 }
             }
-        } catch (e) { Utils.Debug.warn('[NameSpoofer] ChampSelect WS transform failed:', e); }
+        } catch (e) {
+            Utils.Debug.warn('[NameSpoofer] ChampSelect WS transform failed:', e);
+        }
         return payload;
     });
 
@@ -679,7 +907,9 @@ function installHooks(context) {
         if (!cfg.enabled || !cfg.spoofFriends) return payload;
         try {
             aliasFriendsList(payload, active(), 'friend');
-        } catch (e) { Utils.Debug.warn('[NameSpoofer] WS friends transform failed:', e); }
+        } catch (e) {
+            Utils.Debug.warn('[NameSpoofer] WS friends transform failed:', e);
+        }
         return payload;
     });
 
@@ -690,7 +920,9 @@ function installHooks(context) {
         if (!active() && !cfg.spoofFriends) return payload;
         try {
             aliasConversations(payload, active());
-        } catch (e) { Utils.Debug.warn('[NameSpoofer] WS conversations transform failed:', e); }
+        } catch (e) {
+            Utils.Debug.warn('[NameSpoofer] WS conversations transform failed:', e);
+        }
         return payload;
     });
 
@@ -701,7 +933,9 @@ function installHooks(context) {
         if (!active() && !aliasOthersNow() && !cfg.spoofFriends && !cfg.spoofMatchHistory) return payload;
         try {
             aliasTeam(payload, active(), false);
-        } catch (e) { Utils.Debug.warn('[NameSpoofer] WS ballot transform failed:', e); }
+        } catch (e) {
+            Utils.Debug.warn('[NameSpoofer] WS ballot transform failed:', e);
+        }
         return payload;
     });
 
@@ -712,7 +946,9 @@ function installHooks(context) {
         if (!active() && !aliasOthersNow() && !cfg.spoofFriends && !cfg.spoofMatchHistory) return payload;
         try {
             aliasTeam(payload, active(), false);
-        } catch (e) { Utils.Debug.warn('[NameSpoofer] WS eog-stats transform failed:', e); }
+        } catch (e) {
+            Utils.Debug.warn('[NameSpoofer] WS eog-stats transform failed:', e);
+        }
         return payload;
     });
 }
@@ -725,14 +961,18 @@ async function refreshContext() {
         const q = s && s.gameData && s.gameData.queue;
         if (q) ctx.isRanked = !!q.isRanked || RANKED_QUEUES.has(q.id);
         logDebug('refresh', 'phase=' + ctx.phase + ' isRanked=' + ctx.isRanked + ' aliasOthersNow=' + aliasOthersNow());
-    } catch { logDebug('refresh', 'fetch failed (normal during None phase)'); }
+    } catch {
+        logDebug('refresh', 'fetch failed (normal during None phase)');
+    }
 }
 
 function decodeJwtPayload(jwt) {
     try {
         const part = jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
         return JSON.parse(decodeURIComponent(escape(atob(part))));
-    } catch { return null; }
+    } catch {
+        return null;
+    }
 }
 
 async function captureRealIdentity() {
@@ -768,6 +1008,7 @@ async function captureRealIdentity() {
 const OVERRIDE_ATTR = 'puuids-to-name-overrides-json';
 
 let _overrideAttrObserver = null;
+
 function installOverrideAttrObserver() {
     if (_overrideAttrObserver) return;
     _overrideAttrObserver = new MutationObserver(() => {
@@ -777,34 +1018,54 @@ function installOverrideAttrObserver() {
         });
     });
     _overrideAttrObserver.observe(document.body, {
-        childList: true, subtree: true, attributes: true, attributeFilter: [OVERRIDE_ATTR]
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: [OVERRIDE_ATTR]
     });
     // Immediately fix any existing elements
     document.querySelectorAll('[' + OVERRIDE_ATTR + ']').forEach((el) => {
         DomScrubber._fixOverrideAttr(el);
     });
 }
+
 function stopOverrideAttrObserver() {
-    if (_overrideAttrObserver) { _overrideAttrObserver.disconnect(); _overrideAttrObserver = null; }
+    if (_overrideAttrObserver) {
+        _overrideAttrObserver.disconnect();
+        _overrideAttrObserver = null;
+    }
 }
 
 function restoreTextNodeText(node) {
     if (!node || !node.nodeValue) return;
     let v = node.nodeValue;
     let changed = false;
-    const G = real.gameName, T = real.tagLine;
+    const G = real.gameName,
+        T = real.tagLine;
     if (!G) return;
     if (T) {
         const nv = v.split(cfg.gameName + '#' + cfg.tagLine).join(G + '#' + T).split(cfg.gameName + ' #' + cfg.tagLine).join(G + ' #' + T);
-        if (nv !== v) { v = nv; changed = true; }
+        if (nv !== v) {
+            v = nv;
+            changed = true;
+        }
     }
-    if (cfg.gameName && cfg.gameName !== G && v.indexOf(cfg.gameName) !== -1) { v = v.split(cfg.gameName).join(G); changed = true; }
-    if (cfg.tagLine && cfg.tagLine !== T && v.indexOf(cfg.tagLine) !== -1) { v = v.split(cfg.tagLine).join(T); changed = true; }
+    if (cfg.gameName && cfg.gameName !== G && v.indexOf(cfg.gameName) !== -1) {
+        v = v.split(cfg.gameName).join(G);
+        changed = true;
+    }
+    if (cfg.tagLine && cfg.tagLine !== T && v.indexOf(cfg.tagLine) !== -1) {
+        v = v.split(cfg.tagLine).join(T);
+        changed = true;
+    }
     const aliasToReal = {};
     for (const rn of Object.keys(realToAlias)) aliasToReal[realToAlias[rn]] = rn;
     for (const alias of Object.keys(aliasToReal)) {
         const rn = aliasToReal[alias];
-        if (rn !== alias && v.indexOf(alias) !== -1) { v = v.split(alias).join(rn); changed = true; }
+        if (rn !== alias && v.indexOf(alias) !== -1) {
+            v = v.split(alias).join(rn);
+            changed = true;
+        }
     }
     if (changed) node.nodeValue = v;
 }
@@ -827,7 +1088,13 @@ const DomScrubber = {
                     const mo = new MutationObserver(() => {
                         this._applyFrameDoc(doc);
                     });
-                    try { mo.observe(doc.documentElement, { childList: true, subtree: true, characterData: true }); } catch {}
+                    try {
+                        mo.observe(doc.documentElement, {
+                            childList: true,
+                            subtree: true,
+                            characterData: true
+                        });
+                    } catch {}
                     this._frameObservers.set(doc, mo);
                 } catch {}
             };
@@ -838,7 +1105,10 @@ const DomScrubber = {
                     const doc = node.contentDocument;
                     if (doc) {
                         const mo = this._frameObservers.get(doc);
-                        if (mo) { mo.disconnect(); this._frameObservers.delete(doc); }
+                        if (mo) {
+                            mo.disconnect();
+                            this._frameObservers.delete(doc);
+                        }
                         this._frameDocs.delete(doc);
                     }
                 } catch {}
@@ -848,7 +1118,9 @@ const DomScrubber = {
 
     disconnectFrameObservers() {
         for (const [doc, mo] of this._frameObservers) {
-            try { mo.disconnect(); } catch {}
+            try {
+                mo.disconnect();
+            } catch {}
         }
         this._frameObservers = new WeakMap();
         this._frameDocs = new WeakSet();
@@ -874,7 +1146,8 @@ const DomScrubber = {
                         let changed = false;
                         for (const puuid in map) {
                             if (puuid === real.puuid && map[puuid] !== real.gameName) {
-                                map[puuid] = real.gameName; changed = true;
+                                map[puuid] = real.gameName;
+                                changed = true;
                             }
                         }
                         if (changed) el.setAttribute(OVERRIDE_ATTR, JSON.stringify(map));
@@ -893,10 +1166,18 @@ const DomScrubber = {
         document.querySelectorAll('iframe').forEach((iframe) => {
             try {
                 const doc = iframe.contentDocument || iframe.contentWindow?.document;
-                if (doc) { fn(doc); return; }
+                if (doc) {
+                    fn(doc);
+                    return;
+                }
                 iframe.addEventListener('load', () => {
-                    try { const d = iframe.contentDocument || iframe.contentWindow?.document; if (d) fn(d); } catch {}
-                }, { once: true });
+                    try {
+                        const d = iframe.contentDocument || iframe.contentWindow?.document;
+                        if (d) fn(d);
+                    } catch {}
+                }, {
+                    once: true
+                });
             } catch {}
         });
         for (let i = 0; i < window.frames.length; i++) {
@@ -950,7 +1231,10 @@ const DomScrubber = {
                         desired = alias;
                     }
                 }
-                if (desired !== map[puuid]) { map[puuid] = desired; changed = true; }
+                if (desired !== map[puuid]) {
+                    map[puuid] = desired;
+                    changed = true;
+                }
             }
             if (changed) el.setAttribute(OVERRIDE_ATTR, JSON.stringify(map));
         } catch {}
@@ -961,6 +1245,7 @@ const TOOLTIP_SELECTOR = '.player-name__tooltip__game-name, .player-name__toolti
 
 let _tooltipObs = null;
 let _chatObs = null;
+
 function installTooltipObserver() {
     if (_tooltipObs) return;
     _tooltipObs = new MutationObserver((mutations) => {
@@ -978,10 +1263,17 @@ function installTooltipObserver() {
             }
         }
     });
-    _tooltipObs.observe(document.body, { childList: true, subtree: true });
+    _tooltipObs.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
 }
+
 function stopTooltipObserver() {
-    if (_tooltipObs) { _tooltipObs.disconnect(); _tooltipObs = null; }
+    if (_tooltipObs) {
+        _tooltipObs.disconnect();
+        _tooltipObs = null;
+    }
     // Restore already-modified tooltip names (walk through shadow DOMs)
     if (!real.gameName) return;
     const aliasToReal = {};
@@ -993,10 +1285,12 @@ function stopTooltipObserver() {
     }
 }
 const CHAT_NAME_SELECTORS = '.conversation-title, .player-name__game-name, .player-name__alias, .create-panel-game-name, .create-panel-gnt';
+
 function patchUikitName(el) {
     const gn = el.getAttribute('game-name');
     if (gn && realToAlias[gn] && gn !== realToAlias[gn]) el.setAttribute('game-name', realToAlias[gn]);
 }
+
 function installChatObserver() {
     if (_chatObs) return;
     const target = document.querySelector('lol-social-chat-window') || document.body;
@@ -1048,7 +1342,12 @@ function installChatObserver() {
             }
         }
     });
-    _chatObs.observe(target, { childList: true, subtree: true, attributes: true, attributeFilter: ['game-name'] });
+    _chatObs.observe(target, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['game-name']
+    });
     // Deferred re-sweep after roster rebuild populates realToAlias
     setTimeout(() => {
         if (!cfg.enabled) return;
@@ -1060,12 +1359,18 @@ function installChatObserver() {
             const alias = realToAlias[cur];
             Utils.Debug.log('[NS-DEBUG][chat] deferred el="' + (el.className || el.tagName) + '" cur="' + cur + '" alias="' + (alias || 'null') + '"');
             if (!cur || cur === cfg.gameName || cur === real.gameName) continue;
-            if (alias && alias !== cur) { el.textContent = alias; continue; }
+            if (alias && alias !== cur) {
+                el.textContent = alias;
+                continue;
+            }
             const convo = el.closest('.conversation');
             if (convo) {
                 const rawPuuid = convo.getAttribute('data-id') || '';
                 const label = lookupFriend(rawPuuid, cur);
-                if (label && label !== cur) { el.textContent = label; continue; }
+                if (label && label !== cur) {
+                    el.textContent = label;
+                    continue;
+                }
                 const puuid = rawPuuid.split('@')[0];
                 if (friendPuuids.has(puuid)) {
                     const fallback = friendLabel(puuid);
@@ -1075,8 +1380,12 @@ function installChatObserver() {
         }
     }, 1500);
 }
+
 function stopChatObserver() {
-    if (_chatObs) { _chatObs.disconnect(); _chatObs = null; }
+    if (_chatObs) {
+        _chatObs.disconnect();
+        _chatObs = null;
+    }
     // Restore already-modified chat names (walk through shadow DOMs)
     if (!real.gameName) return;
     const aliasToReal = {};
@@ -1103,14 +1412,21 @@ function _queryAllShadow(selector, root) {
 }
 
 let _inviteOrigSummonerName = null;
+
 function installInviteObserver() {
     if (_inviteOrigSummonerName) return;
     const Klass = customElements.get('lol-parties-game-invite');
-    if (!Klass || !Klass.prototype) { Utils.Debug.log('[NS-DEBUG][invite] lol-parties-game-invite not registered yet'); return; }
+    if (!Klass || !Klass.prototype) {
+        Utils.Debug.log('[NS-DEBUG][invite] lol-parties-game-invite not registered yet');
+        return;
+    }
     const orig = Klass.prototype._summonerName;
-    if (!orig) { Utils.Debug.log('[NS-DEBUG][invite] no _summonerName on prototype'); return; }
+    if (!orig) {
+        Utils.Debug.log('[NS-DEBUG][invite] no _summonerName on prototype');
+        return;
+    }
     _inviteOrigSummonerName = orig;
-    Klass.prototype._summonerName = async function (element, summonerId) {
+    Klass.prototype._summonerName = async function(element, summonerId) {
         // Run original only if not cached (avoids double fetch)
         if (!this._name) await orig.call(this, element, summonerId);
         // Always attempt spoofing, even if name was already cached before our patch
@@ -1157,6 +1473,7 @@ function installInviteObserver() {
         }
     }, 1500);
 }
+
 function stopInviteObserver() {
     if (!_inviteOrigSummonerName) return;
     const Klass = customElements.get('lol-parties-game-invite');
@@ -1179,34 +1496,52 @@ function stopInviteObserver() {
 
 const spoofSummonerName = (name) => {
     if (!name) return name;
-    const G = real.gameName, T = real.tagLine;
-    const SG = cfg.gameName || G, ST = cfg.tagLine || T;
+    const G = real.gameName,
+        T = real.tagLine;
+    const SG = cfg.gameName || G,
+        ST = cfg.tagLine || T;
     let v = name;
     if (cfg.enabled) {
         if (active() && G) {
             if (T) {
-                if (v.indexOf(G + '#' + T) !== -1) { v = v.split(G + '#' + T).join(SG + '#' + ST); }
-                if (v.indexOf(G + ' #' + T) !== -1) { v = v.split(G + ' #' + T).join(SG + ' #' + ST); }
+                if (v.indexOf(G + '#' + T) !== -1) {
+                    v = v.split(G + '#' + T).join(SG + '#' + ST);
+                }
+                if (v.indexOf(G + ' #' + T) !== -1) {
+                    v = v.split(G + ' #' + T).join(SG + ' #' + ST);
+                }
             }
-            if (SG !== G && v.indexOf(G) !== -1) { v = v.split(G).join(SG); }
-            if (T && ST !== T && v.indexOf(T) !== -1) { v = v.split(T).join(ST); }
+            if (SG !== G && v.indexOf(G) !== -1) {
+                v = v.split(G).join(SG);
+            }
+            if (T && ST !== T && v.indexOf(T) !== -1) {
+                v = v.split(T).join(ST);
+            }
         }
         if (cfg.spoofFriends || aliasOthersNow()) {
             const aliasValues = new Set(Object.values(realToAlias));
             for (const rn of Object.keys(realToAlias)) {
                 if (aliasValues.has(rn)) continue; // skip keys that are already aliases (prevent cascade)
                 const alias = realToAlias[rn];
-                if (alias !== rn && v.indexOf(rn) !== -1) { v = v.split(rn).join(alias); }
+                if (alias !== rn && v.indexOf(rn) !== -1) {
+                    v = v.split(rn).join(alias);
+                }
             }
         }
     } else {
-        if (G && SG !== G && v.indexOf(SG) !== -1) { v = v.split(SG).join(G); }
-        if (T && ST !== T && v.indexOf(ST) !== -1) { v = v.split(ST).join(T); }
+        if (G && SG !== G && v.indexOf(SG) !== -1) {
+            v = v.split(SG).join(G);
+        }
+        if (T && ST !== T && v.indexOf(ST) !== -1) {
+            v = v.split(ST).join(T);
+        }
         const aliasToReal = {};
         for (const rn of Object.keys(realToAlias)) aliasToReal[realToAlias[rn]] = rn;
         for (const alias of Object.keys(aliasToReal)) {
             const rn = aliasToReal[alias];
-            if (rn !== alias && v.indexOf(alias) !== -1) { v = v.split(alias).join(rn); }
+            if (rn !== alias && v.indexOf(alias) !== -1) {
+                v = v.split(alias).join(rn);
+            }
         }
     }
     return v;
@@ -1245,9 +1580,9 @@ function applyConfig() {
             try {
                 const val = c.get && c.get('partySummonerNames');
                 if (!val) continue;
-                const restored = Array.isArray(val)
-                    ? val.map(n => spoofSummonerName(n))
-                    : spoofSummonerName(String(val));
+                const restored = Array.isArray(val) ?
+                    val.map(n => spoofSummonerName(n)) :
+                    spoofSummonerName(String(val));
                 if (JSON.stringify(restored) !== JSON.stringify(val) && c.set) {
                     c.set('partySummonerNames', restored);
                 }
@@ -1304,18 +1639,32 @@ function aliasTextNodeText(node) {
     let v = node.nodeValue;
     let changed = false;
     if (active() && real.gameName) {
-        const G = real.gameName, T = real.tagLine;
-        const SG = cfg.gameName || G, ST = cfg.tagLine || T;
+        const G = real.gameName,
+            T = real.tagLine;
+        const SG = cfg.gameName || G,
+            ST = cfg.tagLine || T;
         if (T) {
             const nv = v.split(G + '#' + T).join(SG + '#' + ST).split(G + ' #' + T).join(SG + ' #' + ST);
-            if (nv !== v) { v = nv; changed = true; }
+            if (nv !== v) {
+                v = nv;
+                changed = true;
+            }
         }
-        if (SG !== G && v.indexOf(G) !== -1) { v = v.split(G).join(SG); changed = true; }
-        if (ST !== T && v.indexOf(T) !== -1) { v = v.split(T).join(ST); changed = true; }
+        if (SG !== G && v.indexOf(G) !== -1) {
+            v = v.split(G).join(SG);
+            changed = true;
+        }
+        if (ST !== T && v.indexOf(T) !== -1) {
+            v = v.split(T).join(ST);
+            changed = true;
+        }
     }
     for (const rn of Object.keys(realToAlias)) {
         const alias = realToAlias[rn];
-        if (alias !== rn && v.indexOf(rn) !== -1) { v = v.split(rn).join(alias); changed = true; }
+        if (alias !== rn && v.indexOf(rn) !== -1) {
+            v = v.split(rn).join(alias);
+            changed = true;
+        }
     }
     if (changed) node.nodeValue = v;
 }
@@ -1380,7 +1729,10 @@ function swapNameText(el, contextPuuid) {
                     noteFriend(cur, alias);
                 }
             }
-            if (alias && alias !== cur) { target.textContent = alias; continue; }
+            if (alias && alias !== cur) {
+                target.textContent = alias;
+                continue;
+            }
         } else {
             if (isSelfCtx) {
                 if (cur !== real.gameName) target.textContent = real.gameName;
@@ -1444,7 +1796,10 @@ function installEmberHook() {
 
     _hookCleanups.push(Utils.Hooks.Ember.registerRule({
         name: 'ns-hovercard-content',
-        matcher: (args) => args.some(arg => { const k = Object.keys(arg || {}); return k.includes('partySummonerNames') }),
+        matcher: (args) => args.some(arg => {
+            const k = Object.keys(arg || {});
+            return k.includes('partySummonerNames')
+        }),
         mixin(Ember) {
             return {
                 init() {
@@ -1462,9 +1817,9 @@ function installEmberHook() {
                     if (!cfg.enabled) return;
                     const val = this.get && this.get('partySummonerNames');
                     if (!val || (Array.isArray(val) && !val.length)) return;
-                    const spoofed = Array.isArray(val)
-                        ? val.map(n => spoofSummonerName(n))
-                        : spoofSummonerName(String(val));
+                    const spoofed = Array.isArray(val) ?
+                        val.map(n => spoofSummonerName(n)) :
+                        spoofSummonerName(String(val));
                     if (JSON.stringify(spoofed) !== JSON.stringify(val) && this.set) {
                         this.set('partySummonerNames', spoofed);
                     }
@@ -1606,11 +1961,17 @@ function installEmberHook() {
             setTextNode(textEl, cur, label);
         } else if (cur !== cfg.gameName) {
             const cell = el.closest('.summoner-object');
-            if (!cell) { logDebug('aliasPlayer', 'no summoner-object parent'); return; }
+            if (!cell) {
+                logDebug('aliasPlayer', 'no summoner-object parent');
+                return;
+            }
             // Check if known friend by looking up the cell's puuid context
             const cellPuuid = el.getAttribute('data-puuid') || (cell && cell.getAttribute && cell.getAttribute('data-puuid'));
             const label = resolveAlias(cur, cellPuuid);
-            if (!label || label === cur) { logDebug('aliasPlayer', 'label unchanged or null, skip'); return; }
+            if (!label || label === cur) {
+                logDebug('aliasPlayer', 'label unchanged or null, skip');
+                return;
+            }
             logDebug('aliasPlayer', 'other aliasing "' + cur + '" -> "' + label + '"');
             setTextNode(textEl, cur, label);
         }
@@ -1621,7 +1982,7 @@ function installEmberHook() {
         matcher: 'player-name-component',
         hookMethods: [{
             name: 'didRender',
-        callback(Ember, original, ...args) {
+            callback(Ember, original, ...args) {
                 original(...args);
                 if (!this.element) return;
                 if (!cfg.enabled && !_hasSpoofedAnything) return;
@@ -1688,7 +2049,9 @@ function installEmberHook() {
                         }
                         if (cat === 'friend' && sid && sid.length > 4) friendPuuids.add('sid:' + sid);
                         el.textContent = label;
-                        li.querySelectorAll('.player-name__tag-line').forEach((t) => { t.textContent = ''; });
+                        li.querySelectorAll('.player-name__tag-line').forEach((t) => {
+                            t.textContent = '';
+                        });
                     });
                 } else if (!cfg.enabled) {
                     swapNameText(this.element)
@@ -1727,7 +2090,9 @@ function installEmberHook() {
                         const label = catLabel('global', key);
                         realToAlias[cur] = label;
                         el.textContent = label;
-                        li.querySelectorAll('.player-name__tag-line').forEach((t) => { t.textContent = ''; });
+                        li.querySelectorAll('.player-name__tag-line').forEach((t) => {
+                            t.textContent = '';
+                        });
                     });
                 } else if (!cfg.enabled) {
                     swapNameText(this.element)
@@ -1754,11 +2119,20 @@ function installEmberHook() {
                 trackComponent(this);
                 trackMhComponent(this);
                 logDebug('mh-hook', 'didRender element=' + (!!this.element) + ' real.gameName=' + (real.gameName || 'null'));
-                if (!real.gameName) { logDebug('mh-hook', 'early return: no real.gameName'); return; }
+                if (!real.gameName) {
+                    logDebug('mh-hook', 'early return: no real.gameName');
+                    return;
+                }
                 const nameEl = this.element.querySelector('.player-history-mode');
-                if (!nameEl) { logDebug('mh-hook', 'early return: no .player-history-mode'); return; }
+                if (!nameEl) {
+                    logDebug('mh-hook', 'early return: no .player-history-mode');
+                    return;
+                }
                 let cur = (nameEl.textContent || '').replace(/[⁦-⁩‎‏]/g, '').trim();
-                if (!cur) { logDebug('mh-hook', 'early return: empty cur'); return; }
+                if (!cur) {
+                    logDebug('mh-hook', 'early return: empty cur');
+                    return;
+                }
                 logDebug('mh-hook', 'cur=' + cur + ' real.gameName=' + real.gameName);
                 if (cfg.enabled) {
                     if (active() && cur === real.gameName && cur !== cfg.gameName) {
@@ -1769,16 +2143,23 @@ function installEmberHook() {
                         logDebug('mh-hook', '_mhAliasFromComponent=' + (alias || 'null'));
                         if (!alias) alias = realToAlias[cur];
                         logDebug('mh-hook', 'realToAlias[' + cur + ']=' + (alias || 'null') + ' realToAlias size=' + Object.keys(realToAlias).length);
-                        if (alias && alias !== cur) { logDebug('mh-hook', 'aliased ' + cur + ' -> ' + alias); nameEl.textContent = alias; }
-                        else if (!alias) {
+                        if (alias && alias !== cur) {
+                            logDebug('mh-hook', 'aliased ' + cur + ' -> ' + alias);
+                            nameEl.textContent = alias;
+                        } else if (!alias) {
                             let retries = 0;
                             const retry = () => {
-                                if (!this.element || retries++ > 10) { logDebug('mh-hook', 'retry exhausted'); return; }
+                                if (!this.element || retries++ > 10) {
+                                    logDebug('mh-hook', 'retry exhausted');
+                                    return;
+                                }
                                 alias = _mhAliasFromComponent(this);
                                 if (!alias) alias = realToAlias[cur];
                                 logDebug('mh-hook', 'retry ' + retries + ' alias=' + (alias || 'null') + ' realToAlias size=' + Object.keys(realToAlias).length);
-                                if (alias && alias !== cur) { logDebug('mh-hook', 'retry aliased ' + cur + ' -> ' + alias); nameEl.textContent = alias; }
-                                else setTimeout(retry, 100);
+                                if (alias && alias !== cur) {
+                                    logDebug('mh-hook', 'retry aliased ' + cur + ' -> ' + alias);
+                                    nameEl.textContent = alias;
+                                } else setTimeout(retry, 100);
                             };
                             setTimeout(retry, 100);
                         }
@@ -1823,7 +2204,10 @@ function installEmberHook() {
                 if (!this.element) return;
                 if (!cfg.enabled && !_hasSpoofedAnything) return;
                 const nameEl = this.element.querySelector('.member-name, .player-name__game-name, .player-game-name, .name-text, [class*="game-name"]');
-                if (!nameEl) { logDebug('hook', 'ns-roster-member no nameEl'); return; }
+                if (!nameEl) {
+                    logDebug('hook', 'ns-roster-member no nameEl');
+                    return;
+                }
                 const cur = nameEl.textContent.replace(/[⁦-⁩‎‏]/g, '').trim();
                 if (cfg.enabled && cfg.spoofFriends) {
                     trackComponent(this);
@@ -1925,7 +2309,10 @@ function installEmberHook() {
         const el = this.element;
         if (!el) return;
         trackComponent(this);
-        if (!cfg.enabled) { swapNameText(el); return; }
+        if (!cfg.enabled) {
+            swapNameText(el);
+            return;
+        }
         const nameEl = el.querySelector('.player-name__game-name, .player-game-name, [class*="game-name"]');
         if (!nameEl) return;
         let cur = nameEl.textContent.replace(/[⁦-⁩‎‏]/g, '').trim();
@@ -1935,7 +2322,9 @@ function installEmberHook() {
             return;
         }
         const alias = realToAlias[cur];
-        if (alias && alias !== cur) { nameEl.textContent = alias; }
+        if (alias && alias !== cur) {
+            nameEl.textContent = alias;
+        }
     }
 
     _hookCleanups.push(Utils.Hooks.Ember.registerRule({
@@ -1943,7 +2332,10 @@ function installEmberHook() {
         matcher: 'scoreboard-row-component',
         hookMethods: [{
             name: 'didRender',
-            callback(Ember, original, ...args) { original(...args); hookScoreboardRow.call(this); }
+            callback(Ember, original, ...args) {
+                original(...args);
+                hookScoreboardRow.call(this);
+            }
         }, {
             name: 'willDestroy',
             callback(Ember, original, ...args) {
@@ -2015,19 +2407,19 @@ function installEmberHook() {
                 callback(Ember, original, ...args) {
                     original(...args);
                     if (!this.element) return;
-                if (!cfg.enabled && !_hasSpoofedAnything) return;
+                    if (!cfg.enabled && !_hasSpoofedAnything) return;
                     trackComponent(this);
-                swapNameText(this.element);
+                    swapNameText(this.element);
                 }
-        }, {
-            name: 'willDestroy',
-            callback(Ember, original, ...args) {
-                original(...args);
-                untrackComponent(this);
-                _mhComponents.delete(this);
-            }
-        }]
-    }));
+            }, {
+                name: 'willDestroy',
+                callback(Ember, original, ...args) {
+                    original(...args);
+                    untrackComponent(this);
+                    _mhComponents.delete(this);
+                }
+            }]
+        }));
 
     }
 
@@ -2065,13 +2457,21 @@ export function dispose() {
     stopChatObserver();
     stopOverrideAttrObserver();
     stopInviteObserver();
-    for (const fn of _hookCleanups) try { fn(); } catch {}
+    for (const fn of _hookCleanups) try {
+        fn();
+    } catch {}
     _hookCleanups.length = 0;
-    for (const fn of _fetchCleanups) try { fn(); } catch {}
+    for (const fn of _fetchCleanups) try {
+        fn();
+    } catch {}
     _fetchCleanups.length = 0;
     _mhCtx = null;
     // Rerender tracked components to restore original model data
-    for (const c of _emberComponents) { try { c.rerender(); } catch {} }
+    for (const c of _emberComponents) {
+        try {
+            c.rerender();
+        } catch {}
+    }
     _emberComponents.clear();
     // Force full cleanup of realToAlias etc. after all rerenders
     for (const key of Object.keys(realToAlias)) delete realToAlias[key];
@@ -2080,7 +2480,9 @@ export function dispose() {
     friendCounter = 0;
     _postgameNameIndex = 0;
     Object.keys(catMaps).forEach(k => delete catMaps[k]);
-    Object.keys(catCount).forEach(k => { catCount[k] = 0; });
+    Object.keys(catCount).forEach(k => {
+        catCount[k] = 0;
+    });
     _xhrRoutes.length = 0;
     _hooksInstalled = false;
     _xhrInstalled = false;
@@ -2096,7 +2498,9 @@ export function init(context) {
     installHooks(context);
     installEmberHook();
     if (context && context.rcp) {
-        context.rcp.postInit('rcp-fe-ember-libs', (api) => { _emberProvider = api; });
+        context.rcp.postInit('rcp-fe-ember-libs', (api) => {
+            _emberProvider = api;
+        });
     }
     captureRealIdentity();
     refreshContext();
@@ -2114,7 +2518,9 @@ export function init(context) {
                     const q = s && s.gameData && s.gameData.queue;
                     if (q) ctx.isRanked = !!q.isRanked || RANKED_QUEUES.has(q.id);
                     logDebug('session', 'isRanked=' + ctx.isRanked + ' queueId=' + (q ? q.id : 'null') + ' q.isRanked=' + (q ? q.isRanked : 'null'));
-                }).catch(() => { logDebug('session', 'fetch failed (404 normal during some phases)'); });
+                }).catch(() => {
+                    logDebug('session', 'fetch failed (404 normal during some phases)');
+                });
                 if (p === 'ChampSelect') {
                     // Name resolution handled by Ember didRender hooks exclusively
                 }
@@ -2143,9 +2549,17 @@ function setupSettings(context) {
             id: MODULE,
             name: 'Name Spoofer',
             description: DESCRIPTION,
-            settings: [
-                { type: 'toggle', id: 'enabled', label: 'Enable Name Spoofer (master)', value: cfg.enabled, onChange: (v) => saveCfg('enabled', v) },
-                { type: 'custom', render: (row) => buildSettings(row) }
+            settings: [{
+                    type: 'toggle',
+                    id: 'enabled',
+                    label: 'Enable Name Spoofer (master)',
+                    value: cfg.enabled,
+                    onChange: (v) => saveCfg('enabled', v)
+                },
+                {
+                    type: 'custom',
+                    render: (row) => buildSettings(row)
+                }
             ]
         });
     } else {
@@ -2153,36 +2567,85 @@ function setupSettings(context) {
     }
 }
 
-function saveCfg(key, val) { Utils.Store.set(MODULE, key, val); applyConfig(); }
+function saveCfg(key, val) {
+    Utils.Store.set(MODULE, key, val);
+    applyConfig();
+}
 
 function sectionTitle(text) {
     const t = document.createElement('div');
     t.textContent = text;
-    Object.assign(t.style, { color: '#c8aa6e', fontSize: '13px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: '12px' });
+    Object.assign(t.style, {
+        color: '#c8aa6e',
+        fontSize: '13px',
+        fontWeight: '700',
+        textTransform: 'uppercase',
+        letterSpacing: '0.04em',
+        marginTop: '12px'
+    });
     return t;
 }
 
 function nameRow(label, nameKey, dflt, opts = {}) {
-    const { numKey, fixedDefault, width = '150px' } = opts;
+    const {
+        numKey,
+        fixedDefault,
+        width = '150px'
+    } = opts;
     const row = document.createElement('div');
-    Object.assign(row.style, { display: 'flex', alignItems: 'center', gap: '10px' });
+    Object.assign(row.style, {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px'
+    });
     const lab = document.createElement('span');
     lab.textContent = label;
-    Object.assign(lab.style, { color: '#a09b8c', fontSize: '12px', whiteSpace: 'nowrap', flex: '0 0 80px' });
+    Object.assign(lab.style, {
+        color: '#a09b8c',
+        fontSize: '12px',
+        whiteSpace: 'nowrap',
+        flex: '0 0 80px'
+    });
     const input = document.createElement('input');
     input.type = 'text';
     input.value = cfg[nameKey] || '';
     input.placeholder = dflt;
-    Object.assign(input.style, { width, flex: '0 0 auto', background: '#111', border: '1px solid #3e2e13', color: '#f0e6d2', padding: '7px 9px', borderRadius: '4px', outline: 'none', fontSize: '13px' });
+    Object.assign(input.style, {
+        width,
+        flex: '0 0 auto',
+        background: '#111',
+        border: '1px solid #3e2e13',
+        color: '#f0e6d2',
+        padding: '7px 9px',
+        borderRadius: '4px',
+        outline: 'none',
+        fontSize: '13px'
+    });
     input.addEventListener('click', (e) => e.stopPropagation());
-    input.addEventListener('focus', () => { input.style.borderColor = '#c8aa6e'; });
-    input.addEventListener('blur', () => { input.style.borderColor = '#3e2e13'; });
-    input.addEventListener('change', () => { const v = input.value.trim(); saveCfg(nameKey, fixedDefault ? (v || dflt) : v); });
+    input.addEventListener('focus', () => {
+        input.style.borderColor = '#c8aa6e';
+    });
+    input.addEventListener('blur', () => {
+        input.style.borderColor = '#3e2e13';
+    });
+    input.addEventListener('change', () => {
+        const v = input.value.trim();
+        saveCfg(nameKey, fixedDefault ? (v || dflt) : v);
+    });
     row.appendChild(lab);
     row.appendChild(input);
     if (numKey) {
         const wrap = document.createElement('label');
-        Object.assign(wrap.style, { display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '4px', color: '#a09b8c', fontSize: '12px', whiteSpace: 'nowrap', cursor: 'pointer' });
+        Object.assign(wrap.style, {
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            marginLeft: '4px',
+            color: '#a09b8c',
+            fontSize: '12px',
+            whiteSpace: 'nowrap',
+            cursor: 'pointer'
+        });
         const cb = document.createElement('input');
         cb.type = 'checkbox';
         cb.checked = !!cfg[numKey];
@@ -2208,8 +2671,12 @@ function buildSettings(c) {
 
     c.appendChild(sectionTitle('My Name'));
     c.appendChild(Utils.Settings.createToggleRow('Spoof My Name', cfg.spoofSelf, (v) => saveCfg('spoofSelf', v)));
-    c.appendChild(nameRow('Game Name', 'gameName', real.gameName || 'Name Spoofer', { width: '180px' }));
-    c.appendChild(nameRow('Tagline', 'tagLine', real.tagLine || 'Pengu', { width: '90px' }));
+    c.appendChild(nameRow('Game Name', 'gameName', real.gameName || 'Name Spoofer', {
+        width: '180px'
+    }));
+    c.appendChild(nameRow('Tagline', 'tagLine', real.tagLine || 'Pengu', {
+        width: '90px'
+    }));
 
     c.appendChild(sectionTitle('Where to Spoof'));
     c.appendChild(Utils.Settings.createToggleRow('Friends list / social / invite panel', cfg.spoofFriends, (v) => saveCfg('spoofFriends', v)));
@@ -2218,11 +2685,23 @@ function buildSettings(c) {
     c.appendChild(Utils.Settings.createToggleRow('Match History & Post-Game', cfg.spoofMatchHistory, (v) => saveCfg('spoofMatchHistory', v)));
 
     c.appendChild(sectionTitle('Names for Other Players'));
-    c.appendChild(nameRow('Friend', 'friendName', 'Friend', { numKey: 'friendNumbers', fixedDefault: true }));
-    c.appendChild(nameRow('Other', 'globalName', 'Player', { numKey: 'globalNumbers', fixedDefault: true }));
+    c.appendChild(nameRow('Friend', 'friendName', 'Friend', {
+        numKey: 'friendNumbers',
+        fixedDefault: true
+    }));
+    c.appendChild(nameRow('Other', 'globalName', 'Player', {
+        numKey: 'globalNumbers',
+        fixedDefault: true
+    }));
 
     const credit = document.createElement('div');
-    Object.assign(credit.style, { marginTop: 'auto', textAlign: 'right', fontSize: '11px', color: '#5a7080', paddingTop: '12px' });
+    Object.assign(credit.style, {
+        marginTop: 'auto',
+        textAlign: 'right',
+        fontSize: '11px',
+        color: '#5a7080',
+        paddingTop: '12px'
+    });
     credit.textContent = 'by Lx @iIlusion';
     c.appendChild(credit);
 }

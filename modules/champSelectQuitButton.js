@@ -21,7 +21,9 @@ async function dodgeQueue() {
     const endpoint = '/lol-login/v1/session/invoke?destination=lcdsServiceProxy&method=call&args=["","teambuilder-draft","quitV2",""]';
     for (let i = 0; i < 10; i++) {
         try {
-            await Utils.LCU.post(endpoint, '["","teambuilder-draft","quitV2",""]', { raw: true });
+            await Utils.LCU.post(endpoint, '["","teambuilder-draft","quitV2",""]', {
+                raw: true
+            });
             Utils.Debug.log(`[DodgeButton] quitV2 attempt ${i + 1} sent`);
         } catch (err) {
             Utils.Debug.error(`[DodgeButton] quitV2 attempt ${i + 1} failed:`, err);
@@ -57,25 +59,31 @@ export function init(context) {
                 original(...args);
                 if (!Utils.Store.get('champSelectQuitButton', 'enabled')) return;
                 if (!this.element) return;
-                
+
                 const container = this.element.querySelector('.bottom-right-buttons');
                 if (!container) return;
-                
+
                 if (!container.querySelector('#pm-quit-btn')) {
                     const btn = document.createElement('lol-uikit-flat-button');
                     btn.id = 'pm-quit-btn';
                     btn.textContent = 'Dodge';
                     btn.style.cssText = 'margin-right: 10px; margin-top: 5px; width: auto; min-width: 80px; text-align: center;';
-                    
+
                     let dodging = false;
                     btn.onclick = async () => {
                         if (dodging) return;
                         dodging = true;
                         btn.disabled = true;
-                        try { await dodgeQueue(); } 
-                        finally { setTimeout(() => { dodging = false; btn.disabled = false; }, 1000); }
+                        try {
+                            await dodgeQueue();
+                        } finally {
+                            setTimeout(() => {
+                                dodging = false;
+                                btn.disabled = false;
+                            }, 1000);
+                        }
                     };
-                    
+
                     if (container.firstChild) {
                         container.insertBefore(btn, container.firstChild);
                     } else {

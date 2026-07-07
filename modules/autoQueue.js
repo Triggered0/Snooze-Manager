@@ -29,7 +29,10 @@ async function fetchQueues() {
         }
         _availableQueues = queues
             .filter(q => q.queueAvailability === 'Available' && q.isVisible)
-            .map(q => ({ id: q.id, name: q.name || q.description || String(q.id) }));
+            .map(q => ({
+                id: q.id,
+                name: q.name || q.description || String(q.id)
+            }));
         Utils.Debug.log('[AutoQueue]', `Loaded ${_availableQueues.length} queues:`, _availableQueues.map(q => `${q.name}(${q.id})`).join(', '));
     } catch (e) {
         Utils.Debug.warn('[AutoQueue] Failed to load queues from Assets:', e);
@@ -46,7 +49,7 @@ async function reQueue() {
     _queuing = true;
     try {
         const queueId = Utils.Store.get('autoQueue', 'queueId');
-        const delay   = Utils.Store.get('autoQueue', 'delay') || 0;
+        const delay = Utils.Store.get('autoQueue', 'delay') || 0;
         const enabled = Utils.Store.get('autoQueue', 'enabled');
 
         Utils.Debug.log('[AutoQueue]', `reQueue() — enabled=${enabled}, queueId=${queueId}, delay=${delay}s`);
@@ -65,7 +68,7 @@ async function reQueue() {
             });
             await new Promise(r => setTimeout(r, delayMs));
             unregisterPanic();
-            
+
             if (isCancelled) {
                 Utils.Debug.log('[AutoQueue]', 'Cancelled via Panic Key - aborting.');
                 return;
@@ -92,7 +95,9 @@ async function reQueue() {
 
         Utils.Debug.log('[AutoQueue]', `POST /lol-lobby/v2/lobby  { queueId: ${queueId} }`);
         try {
-            const lobbyRes = await Utils.LCU.post('/lol-lobby/v2/lobby', { queueId: Number(queueId) });
+            const lobbyRes = await Utils.LCU.post('/lol-lobby/v2/lobby', {
+                queueId: Number(queueId)
+            });
             Utils.Debug.log('[AutoQueue]', 'Lobby created:', JSON.stringify(lobbyRes)?.slice(0, 120));
         } catch (e) {
             Utils.Debug.log('[AutoQueue]', 'ERROR creating lobby:', e?.message ?? e);
@@ -123,16 +128,30 @@ function renderSettings(container) {
 
     // Queue selector
     const queueRow = document.createElement('div');
-    Object.assign(queueRow.style, { display: 'flex', alignItems: 'center', gap: '10px' });
+    Object.assign(queueRow.style, {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px'
+    });
 
     const queueLabel = document.createElement('span');
     queueLabel.textContent = 'Queue';
-    Object.assign(queueLabel.style, { color: '#a09b8c', fontSize: '12px', whiteSpace: 'nowrap' });
+    Object.assign(queueLabel.style, {
+        color: '#a09b8c',
+        fontSize: '12px',
+        whiteSpace: 'nowrap'
+    });
 
     const queueSelect = document.createElement('select');
     Object.assign(queueSelect.style, {
-        background: '#111', color: '#f0e6d2', border: '1px solid #3e2e13',
-        padding: '5px 8px', borderRadius: '2px', flex: '1', outline: 'none', fontSize: '13px'
+        background: '#111',
+        color: '#f0e6d2',
+        border: '1px solid #3e2e13',
+        padding: '5px 8px',
+        borderRadius: '2px',
+        flex: '1',
+        outline: 'none',
+        fontSize: '13px'
     });
 
     function populateQueueSelect() {
@@ -178,8 +197,8 @@ function renderSettings(container) {
 
     const currentPanicKey = Utils.Store.get('global', 'panicKey') || 'F2';
     container.appendChild(Utils.Settings.createHotkeyRow(
-        'Panic Key (Cancel Auto Actions)', 
-        currentPanicKey, 
+        'Panic Key (Cancel Auto Actions)',
+        currentPanicKey,
         (newKey) => Utils.Store.set('global', 'panicKey', newKey),
         'Note: The Panic Key only works if you have set a Delay greater than 0 seconds. You must press the key during the countdown window to cancel the auto-queue.'
     ));
@@ -204,8 +223,7 @@ export function init(context) {
             id: 'autoQueue',
             name: 'Auto Queue',
             description: 'Automatically re-queues into your chosen game mode after a match ends, with configurable delay.',
-            settings: [
-                {
+            settings: [{
                     type: 'toggle',
                     label: 'Enable Auto Queue',
                     value: isEnabled,

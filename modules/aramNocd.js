@@ -129,15 +129,13 @@ export function init(context) {
             id: 'aramNocd',
             name: 'ARAM No Cooldown',
             description: 'Removes the cooldown when swapping champions with the ARAM bench.',
-            settings: [
-                {
-                    type: 'toggle',
-                    id: 'sm:aramNocd',
-                    label: 'Enable ARAM No Cooldown',
-                    value: isEnabled,
-                    onChange: (val) => toggleFeature(val)
-                }
-            ]
+            settings: [{
+                type: 'toggle',
+                id: 'sm:aramNocd',
+                label: 'Enable ARAM No Cooldown',
+                value: isEnabled,
+                onChange: (val) => toggleFeature(val)
+            }]
         });
     } else {
         Utils.DOM.observer.observe("lol-uikit-scrollable.aram-nocd-settings", (plugin) => {

@@ -68,8 +68,8 @@ function renderExtraSettings(container, native = false) {
     // Panic Key Hotkey
     const currentPanicKey = Utils.Store.get('global', 'panicKey') || 'F2';
     container.appendChild(Utils.Settings.createHotkeyRow(
-        'Panic Key (Cancel Auto Actions)', 
-        currentPanicKey, 
+        'Panic Key (Cancel Auto Actions)',
+        currentPanicKey,
         (newKey) => Utils.Store.set('global', 'panicKey', newKey),
         'Note: The Panic Key only works if you have set an Accept Delay greater than 0 seconds. You must press the key during the countdown window to cancel the action.'
     ));
@@ -98,8 +98,7 @@ export function init(context) {
             id: 'autoAccept',
             name: 'Auto Accept Match',
             description: 'Automatically accepts matchmaking ready checks with optional delay and queue exit on decline.',
-            settings: [
-                {
+            settings: [{
                     type: 'toggle',
                     id: SETTINGS_KEY,
                     label: 'Enable Auto Accept',
@@ -116,12 +115,12 @@ export function init(context) {
         Utils.DOM.observer.observe("lol-uikit-scrollable.auto-accept-settings", (plugin) => {
             const row = document.createElement("div");
             row.classList.add("plugins-settings-row");
-        row.appendChild(
-            Utils.Settings.createToggleRow("Enable Auto Accept", isEnabled, (val) => {
-                isEnabled = val;
-                toggleAutoAccept(isEnabled);
-            })
-        );
+            row.appendChild(
+                Utils.Settings.createToggleRow("Enable Auto Accept", isEnabled, (val) => {
+                    isEnabled = val;
+                    toggleAutoAccept(isEnabled);
+                })
+            );
             const extraRow = document.createElement("div");
             extraRow.classList.add("plugins-settings-row");
             extraRow.style.marginTop = "10px";

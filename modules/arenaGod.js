@@ -18,8 +18,8 @@ let progressCache = null;
 let progressPanel = null;
 
 function injectStyles() {
-  const sheet = new CSSStyleSheet();
-  sheet.replaceSync(`
+    const sheet = new CSSStyleSheet();
+    sheet.replaceSync(`
     .champion-grid.sm-arena-active .grid-champion[data-sm-status] .grid-champion-overlay {
       opacity: 1 !important;
       display: block !important;
@@ -49,9 +49,9 @@ function injectStyles() {
     }
   `);
 
-  if (!document.adoptedStyleSheets.includes(sheet)) {
-      document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
-  }
+    if (!document.adoptedStyleSheets.includes(sheet)) {
+        document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+    }
 }
 
 function makeDraggable(el) {
@@ -62,7 +62,7 @@ function makeDraggable(el) {
         const rect = el.getBoundingClientRect();
         el.style.right = '';
         el.style.left = rect.left + 'px';
-        el.style.top  = rect.top  + 'px';
+        el.style.top = rect.top + 'px';
 
         const offsetX = e.clientX - rect.left;
         const offsetY = e.clientY - rect.top;
@@ -72,15 +72,20 @@ function makeDraggable(el) {
 
         const onMove = (e) => {
             el.style.left = (e.clientX - offsetX) + 'px';
-            el.style.top  = (e.clientY - offsetY) + 'px';
+            el.style.top = (e.clientY - offsetY) + 'px';
         };
 
         el.addEventListener('pointermove', onMove);
         el.addEventListener('pointerup', () => {
             el.removeEventListener('pointermove', onMove);
             el.style.cursor = 'grab';
-            Utils.Store.set('arenaGod', POS_KEY, { left: el.style.left, top: el.style.top });
-        }, { once: true });
+            Utils.Store.set('arenaGod', POS_KEY, {
+                left: el.style.left,
+                top: el.style.top
+            });
+        }, {
+            once: true
+        });
     });
 }
 
@@ -91,9 +96,9 @@ function updatePanelContent() {
     const required = progressCache.required || 0;
     const playedCount = progressCache.played?.size || 0;
 
-    const pct = required
-        ? Math.min(100, Math.round((current / required) * 100))
-        : 0;
+    const pct = required ?
+        Math.min(100, Math.round((current / required) * 100)) :
+        0;
 
     const remaining = Math.max(0, required - current);
 
@@ -171,7 +176,10 @@ function updatePanelContent() {
 
 function renderProgressPanel() {
     if (!progressCache || !isEnabled || !currentArenaMode) {
-        if (progressPanel) { progressPanel.remove(); progressPanel = null; }
+        if (progressPanel) {
+            progressPanel.remove();
+            progressPanel = null;
+        }
         return;
     }
 
@@ -220,7 +228,10 @@ async function handlePhaseChange(phase) {
     } else {
         if (currentArenaMode) {
             currentArenaMode = false;
-            if (progressPanel) { progressPanel.remove(); progressPanel = null; }
+            if (progressPanel) {
+                progressPanel.remove();
+                progressPanel = null;
+            }
             document.querySelectorAll('.champion-grid').forEach(el => el.classList.remove('sm-arena-active'));
             document.querySelectorAll('.grid-champion[data-sm-status]').forEach(el => el.removeAttribute('data-sm-status'));
         }
@@ -279,16 +290,16 @@ export function init(context) {
             callback(Ember, original, ...args) {
                 original(...args);
                 if (!isEnabled || !currentArenaMode || !this.element || !progressCache) return;
-                
+
                 const id = this.get('championConfiguration.champion.id');
                 if (!id) return;
-                
+
                 // Ensure the parent container knows the grid is active
                 const gridContainer = this.element.closest('.champion-grid');
                 if (gridContainer && !gridContainer.classList.contains('sm-arena-active')) {
                     gridContainer.classList.add('sm-arena-active');
                 }
-                
+
                 if (progressCache.first.has(id)) {
                     this.element.setAttribute('data-sm-status', 'first');
                 } else if (progressCache.played.has(id)) {

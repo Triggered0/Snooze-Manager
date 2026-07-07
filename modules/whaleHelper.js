@@ -9,7 +9,7 @@ import Utils from './generalUtils.js';
 
 // Config
 const STYLE_ID = 'sm-whale-helper-styles';
-const BTN_ID   = 'sm-whale-helper-btn';
+const BTN_ID = 'sm-whale-helper-btn';
 const PANEL_ID = 'sm-whale-helper-panel';
 const BTN_ATTR = 'data-sm-whale-btn';
 const RANDOMIZER_BTN_ATTR = 'data-sm-randomizer-btn';
@@ -20,7 +20,7 @@ const BADGE_ATTR = 'data-sm-tier-badge';
 const CLASSIC_RARITIES = new Set(['kNoRarity', 'kDefault', '']);
 
 // State
-let isLootEnabled     = true;
+let isLootEnabled = true;
 let isSkinTierEnabled = true;
 let isDropOddsEnabled = true;
 let isHideUnownedEnabled = false;
@@ -95,10 +95,38 @@ let currentTab = 'skins';
 let searchQuery = '';
 
 const tabData = {
-    skins: { loaded: false, items: [], cardMap: new Map(), activeFilter: 'all', fetcher: fetchUnownedSkins, subtitle: "Rerollable Skins you don't own yet" },
-    icons: { loaded: false, items: [], cardMap: new Map(), activeFilter: 'all', fetcher: fetchUnownedIcons, subtitle: "Rerollable Icons you don't own yet" },
-    wards: { loaded: false, items: [], cardMap: new Map(), activeFilter: 'all', fetcher: fetchUnownedWards, subtitle: "Rerollable Wards you don't own yet" },
-    emotes: { loaded: false, items: [], cardMap: new Map(), activeFilter: 'all', fetcher: fetchUnownedEmotes, subtitle: "Rerollable Emotes you don't own yet" }
+    skins: {
+        loaded: false,
+        items: [],
+        cardMap: new Map(),
+        activeFilter: 'all',
+        fetcher: fetchUnownedSkins,
+        subtitle: "Rerollable Skins you don't own yet"
+    },
+    icons: {
+        loaded: false,
+        items: [],
+        cardMap: new Map(),
+        activeFilter: 'all',
+        fetcher: fetchUnownedIcons,
+        subtitle: "Rerollable Icons you don't own yet"
+    },
+    wards: {
+        loaded: false,
+        items: [],
+        cardMap: new Map(),
+        activeFilter: 'all',
+        fetcher: fetchUnownedWards,
+        subtitle: "Rerollable Wards you don't own yet"
+    },
+    emotes: {
+        loaded: false,
+        items: [],
+        cardMap: new Map(),
+        activeFilter: 'all',
+        fetcher: fetchUnownedEmotes,
+        subtitle: "Rerollable Emotes you don't own yet"
+    }
 };
 let sessionUnsub = null;
 let currentChampId = null;
@@ -263,18 +291,68 @@ function injectStyles() {
 
 // Metadata
 const RARITY_META = {
-    kTranscendent: { label: 'Transcendent', color: '#f0e6d2', bg: '#3a1500', icon: '/lol-game-data/assets/v1/rarity-gem-icons/transcendent.png' },
-    kExalted:      { label: 'Exalted',      color: '#f0e6d2', bg: '#3a1500', icon: '/lol-game-data/assets/v1/rarity-gem-icons/exalted.png' },
-    kUltimate:     { label: 'Ultimate',     color: '#f0c070', bg: '#2a1500', icon: '/lol-game-data/assets/v1/rarity-gem-icons/ultimate.png' },
-    kMythic:       { label: 'Mythic',       color: '#c896e8', bg: '#1a0028', icon: '/lol-game-data/assets/v1/rarity-gem-icons/mythic.png' },
-    kLegendary:    { label: 'Legendary',    color: '#e8a040', bg: '#1e1000', icon: '/lol-game-data/assets/v1/rarity-gem-icons/legendary.png' },
-    kEpic:         { label: 'Epic',         color: '#9090f4', bg: '#0a0018', icon: '/lol-game-data/assets/v1/rarity-gem-icons/epic.png' },
-    kExclusive:    { label: 'Mythic',       color: '#c896e8', bg: '#1a0028', icon: '/lol-game-data/assets/v1/rarity-gem-icons/mythic.png' },
-    kDefault:      { label: 'Classic',      color: '#a09b8c', bg: '#111',    icon: '' },
-    kNoRarity:     { label: 'Classic',      color: '#a09b8c', bg: '#111',    icon: '' },
-    '':            { label: 'Classic',      color: '#a09b8c', bg: '#111',    icon: '' },
+    kTranscendent: {
+        label: 'Transcendent',
+        color: '#f0e6d2',
+        bg: '#3a1500',
+        icon: '/lol-game-data/assets/v1/rarity-gem-icons/transcendent.png'
+    },
+    kExalted: {
+        label: 'Exalted',
+        color: '#f0e6d2',
+        bg: '#3a1500',
+        icon: '/lol-game-data/assets/v1/rarity-gem-icons/exalted.png'
+    },
+    kUltimate: {
+        label: 'Ultimate',
+        color: '#f0c070',
+        bg: '#2a1500',
+        icon: '/lol-game-data/assets/v1/rarity-gem-icons/ultimate.png'
+    },
+    kMythic: {
+        label: 'Mythic',
+        color: '#c896e8',
+        bg: '#1a0028',
+        icon: '/lol-game-data/assets/v1/rarity-gem-icons/mythic.png'
+    },
+    kLegendary: {
+        label: 'Legendary',
+        color: '#e8a040',
+        bg: '#1e1000',
+        icon: '/lol-game-data/assets/v1/rarity-gem-icons/legendary.png'
+    },
+    kEpic: {
+        label: 'Epic',
+        color: '#9090f4',
+        bg: '#0a0018',
+        icon: '/lol-game-data/assets/v1/rarity-gem-icons/epic.png'
+    },
+    kExclusive: {
+        label: 'Mythic',
+        color: '#c896e8',
+        bg: '#1a0028',
+        icon: '/lol-game-data/assets/v1/rarity-gem-icons/mythic.png'
+    },
+    kDefault: {
+        label: 'Classic',
+        color: '#a09b8c',
+        bg: '#111',
+        icon: ''
+    },
+    kNoRarity: {
+        label: 'Classic',
+        color: '#a09b8c',
+        bg: '#111',
+        icon: ''
+    },
+    '': {
+        label: 'Classic',
+        color: '#a09b8c',
+        bg: '#111',
+        icon: ''
+    },
 };
-const RARITY_ORDER = ['kTranscendent','kExalted','kUltimate','kMythic','kExclusive','kLegendary','kEpic','kDefault','kNoRarity',''];
+const RARITY_ORDER = ['kTranscendent', 'kExalted', 'kUltimate', 'kMythic', 'kExclusive', 'kLegendary', 'kEpic', 'kDefault', 'kNoRarity', ''];
 
 function getRarityMeta(rarity) {
     return RARITY_META[rarity] ?? RARITY_META[''];
@@ -285,7 +363,7 @@ async function loadSkinsCache() {
     if (skinsCache.size > 0) return;
     try {
         const data = await Utils.LCU.get('/lol-game-data/assets/v1/skins.json');
-        
+
         const processSkin = (skin) => {
             if (skin?.id === undefined) return;
             skinsCache.set(Number(skin.id), skin);
@@ -296,7 +374,10 @@ async function loadSkinsCache() {
                 processSkin(skin);
                 if (Array.isArray(skin.chromas)) {
                     skin.chromas.forEach(chroma => {
-                        if (chroma?.id !== undefined) skinsCache.set(Number(chroma.id), {...skin, id: chroma.id});
+                        if (chroma?.id !== undefined) skinsCache.set(Number(chroma.id), {
+                            ...skin,
+                            id: chroma.id
+                        });
                     });
                 }
             });
@@ -305,7 +386,10 @@ async function loadSkinsCache() {
                 processSkin(skin);
                 if (Array.isArray(skin.chromas)) {
                     skin.chromas.forEach(chroma => {
-                        if (chroma?.id !== undefined) skinsCache.set(Number(chroma.id), {...skin, id: chroma.id});
+                        if (chroma?.id !== undefined) skinsCache.set(Number(chroma.id), {
+                            ...skin,
+                            id: chroma.id
+                        });
                     });
                 }
             });
@@ -328,7 +412,7 @@ function buildBadge(rarity) {
     badge.setAttribute(BADGE_ATTR, 'true');
     badge.setAttribute('data-rarity', rarity || 'kDefault');
     badge.title = meta.label + ' skin';
-    badge.style.color      = meta.color;
+    badge.style.color = meta.color;
     badge.style.background = meta.bg;
 
     const iconSpan = document.createElement('span');
@@ -350,9 +434,9 @@ function buildBadge(rarity) {
 function updateBadge(nameContainer, skinId) {
     if (!isSkinTierEnabled) return;
 
-    const root = nameContainer.classList?.contains('champion-skin-name')
-        ? nameContainer
-        : nameContainer.closest?.('.champion-skin-name') ?? nameContainer;
+    const root = nameContainer.classList?.contains('champion-skin-name') ?
+        nameContainer :
+        nameContainer.closest?.('.champion-skin-name') ?? nameContainer;
 
     const existingBadges = root.querySelectorAll(`[${BADGE_ATTR}]`);
 
@@ -364,7 +448,7 @@ function updateBadge(nameContainer, skinId) {
     const skinObj = skinsCache.get(skinId);
     const rarity = skinObj.rarity ?? '';
     const targetRarityAttr = rarity || 'kDefault';
-    
+
     if (HIDE_CLASSIC && CLASSIC_RARITIES.has(rarity)) {
         if (existingBadges.length > 0) existingBadges.forEach(el => el.remove());
         return;
@@ -392,12 +476,12 @@ function getComponentFromElement(element) {
 function extractSkinIdFromComponent(component) {
     if (!component) return null;
     try {
-        return component.get?.('viewSkin.id') 
-            || component.get?.('skin.id') 
-            || component.get?.('selectedSkinId')
-            || component.get?.('skinId')
-            || component.skin?.id 
-            || component.selectedSkin?.id;
+        return component.get?.('viewSkin.id') ||
+            component.get?.('skin.id') ||
+            component.get?.('selectedSkinId') ||
+            component.get?.('skinId') ||
+            component.skin?.id ||
+            component.selectedSkin?.id;
     } catch (e) {
         return null;
     }
@@ -429,7 +513,10 @@ function mountSessionObserver() {
 }
 
 function unmountSessionObserver() {
-    if (sessionUnsub) { sessionUnsub(); sessionUnsub = null; }
+    if (sessionUnsub) {
+        sessionUnsub();
+        sessionUnsub = null;
+    }
     currentChampId = null;
 }
 
@@ -447,15 +534,23 @@ async function getSessionToken() {
 async function evaluateSgpQuery(commonBase, sessionToken, query) {
     const res = await fetch(`${commonBase}/loot/v2/query/evaluate`, {
         method: 'PUT',
-        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
-        body: JSON.stringify({ query })
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${sessionToken}`
+        },
+        body: JSON.stringify({
+            query
+        })
     });
     if (!res.ok) throw new Error(`SGP loot query failed: ${res.status}`);
     return res.json();
 }
 
 async function fetchUnownedSkins() {
-    const { commonBase } = await Utils.GameData.getSgpContext();
+    const {
+        commonBase
+    } = await Utils.GameData.getSgpContext();
     const sessionToken = await getSessionToken();
 
     const [resNonExclusive, resExclusive] = await Promise.all([
@@ -479,9 +574,14 @@ async function fetchUnownedSkins() {
         const skin = skinsCache.get(skinId);
         const name = skin?.name ?? `Unknown Skin (${skinId})`;
         results.push({
-            id: skinId, originalName: item, name: name, lowerName: name.toLowerCase(),
-            rarity: skin?.rarity ?? '', tilePath: skin?.tilePath ?? '',
-            isRental: item.includes('SKIN_RENTAL'), isExclusive: exclusiveSet.has(item) && !item.includes('SKIN_RENTAL'),
+            id: skinId,
+            originalName: item,
+            name: name,
+            lowerName: name.toLowerCase(),
+            rarity: skin?.rarity ?? '',
+            tilePath: skin?.tilePath ?? '',
+            isRental: item.includes('SKIN_RENTAL'),
+            isExclusive: exclusiveSet.has(item) && !item.includes('SKIN_RENTAL'),
         });
     }
 
@@ -496,75 +596,91 @@ async function fetchUnownedSkins() {
 }
 
 async function fetchUnownedIcons() {
-    const { commonBase } = await Utils.GameData.getSgpContext();
+    const {
+        commonBase
+    } = await Utils.GameData.getSgpContext();
     const sessionToken = await getSessionToken();
     const query = "type == SUMMONERICON  && !hasTag('norerolloutput')";
     const res = await evaluateSgpQuery(commonBase, sessionToken, query);
-    
+
     const inventory = await Utils.LCU.get('/lol-inventory/v2/inventory/SUMMONER_ICON').catch(() => []);
     const ownedIds = new Set(inventory.map(i => i.itemId));
-    
+
     const data = await Utils.LCU.get('/lol-game-data/assets/v1/summoner-icons.json').catch(() => []);
     const dataMap = new Map();
     if (Array.isArray(data)) data.forEach(d => dataMap.set(d.id, d));
-    
+
     const results = [];
     for (const item of res.lootItemNames || []) {
         const match = item.match(/\d+$/);
         const id = match ? parseInt(match[0], 10) : null;
         if (!id || ownedIds.has(id)) continue;
-        
+
         const d = dataMap.get(id);
         const name = d?.title || d?.name || `Unknown Icon (${id})`;
         results.push({
-            id: id, originalName: item, name: name, lowerName: name.toLowerCase(),
-            rarity: '', tilePath: d?.iconPath || `/lol-game-data/assets/v1/profile-icons/${id}.jpg`,
-            isRental: false, isExclusive: false
+            id: id,
+            originalName: item,
+            name: name,
+            lowerName: name.toLowerCase(),
+            rarity: '',
+            tilePath: d?.iconPath || `/lol-game-data/assets/v1/profile-icons/${id}.jpg`,
+            isRental: false,
+            isExclusive: false
         });
     }
-    
+
     results.sort((a, b) => a.name.localeCompare(b.name));
     return results;
 }
 
 async function fetchUnownedWards() {
-    const { commonBase } = await Utils.GameData.getSgpContext();
+    const {
+        commonBase
+    } = await Utils.GameData.getSgpContext();
     const sessionToken = await getSessionToken();
     const query = "type == WARDSKIN && value == 640 && !hasTag('norerolloutput')";
     const res = await evaluateSgpQuery(commonBase, sessionToken, query);
-    
+
     const inventory = await Utils.LCU.get('/lol-inventory/v2/inventory/WARD_SKIN').catch(() => []);
     const ownedIds = new Set(inventory.map(i => i.itemId));
-    
+
     const data = await Utils.LCU.get('/lol-game-data/assets/v1/ward-skins.json').catch(() => []);
     const dataMap = new Map();
     if (Array.isArray(data)) data.forEach(d => dataMap.set(d.id, d));
-    
+
     const results = [];
     for (const item of res.lootItemNames || []) {
         const match = item.match(/\d+$/);
         const id = match ? parseInt(match[0], 10) : null;
         if (!id || ownedIds.has(id)) continue;
-        
+
         const d = dataMap.get(id);
         const name = d?.name || `Unknown Ward (${id})`;
         results.push({
-            id: id, originalName: item, name: name, lowerName: name.toLowerCase(),
-            rarity: '', tilePath: d?.wardImagePath || '',
-            isRental: true, isExclusive: false
+            id: id,
+            originalName: item,
+            name: name,
+            lowerName: name.toLowerCase(),
+            rarity: '',
+            tilePath: d?.wardImagePath || '',
+            isRental: true,
+            isExclusive: false
         });
     }
-    
+
     results.sort((a, b) => a.name.localeCompare(b.name));
     return results;
 }
 
 async function fetchUnownedEmotes() {
-    const { commonBase } = await Utils.GameData.getSgpContext();
+    const {
+        commonBase
+    } = await Utils.GameData.getSgpContext();
     const sessionToken = await getSessionToken();
     const query = "!hasTag(\"norerolloutput\") && type == EMOTE";
     const res = await evaluateSgpQuery(commonBase, sessionToken, query);
-    
+
     const catalog = await Utils.LCU.get('/lol-catalog/v1/items/EMOTE').catch(() => []);
     const unownedMap = new Map();
     if (Array.isArray(catalog)) {
@@ -572,22 +688,27 @@ async function fetchUnownedEmotes() {
             if (!c.owned) unownedMap.set(c.itemId, c);
         });
     }
-    
+
     const results = [];
     for (const item of res.lootItemNames || []) {
         const match = item.match(/\d+$/);
         const id = match ? parseInt(match[0], 10) : null;
         if (!id || !unownedMap.has(id)) continue;
-        
+
         const c = unownedMap.get(id);
         const name = c.name || `Unknown Emote (${id})`;
         results.push({
-            id: id, originalName: item, name: name, lowerName: name.toLowerCase(),
-            rarity: '', tilePath: c.imagePath || '',
-            isRental: false, isExclusive: false
+            id: id,
+            originalName: item,
+            name: name,
+            lowerName: name.toLowerCase(),
+            rarity: '',
+            tilePath: c.imagePath || '',
+            isRental: false,
+            isExclusive: false
         });
     }
-    
+
     results.sort((a, b) => a.name.localeCompare(b.name));
     return results;
 }
@@ -596,7 +717,10 @@ let panelEl = null;
 
 
 function closePanel(e) {
-    if (e) { e.preventDefault(); e.stopPropagation(); }
+    if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
     if (panelEl) panelEl.classList.remove('sm-show');
 }
 
@@ -605,28 +729,33 @@ function buildCard(item) {
     const card = document.createElement('div');
     card.className = 'sm-whale-card';
     card.title = item.name;
-    
+
     const img = document.createElement('img');
-    img.className = 'sm-whale-card-img'; 
+    img.className = 'sm-whale-card-img';
     img.loading = 'lazy';
     img.decoding = 'async';
     img.src = item.tilePath || '';
-    img.onerror = () => { img.style.opacity = '0.2'; };
+    img.onerror = () => {
+        img.style.opacity = '0.2';
+    };
     card.appendChild(img);
 
     const info = document.createElement('div');
     info.className = 'sm-whale-card-info';
 
     const nameEl = document.createElement('div');
-    nameEl.className = 'sm-whale-card-name'; nameEl.textContent = item.name;
+    nameEl.className = 'sm-whale-card-name';
+    nameEl.textContent = item.name;
     info.appendChild(nameEl);
 
     if (item.rarity) {
         const rarityEl = document.createElement('div');
-        rarityEl.className = 'sm-whale-card-rarity'; rarityEl.style.color = meta.color;
+        rarityEl.className = 'sm-whale-card-rarity';
+        rarityEl.style.color = meta.color;
         if (meta.icon) {
             const gemImg = document.createElement('img');
-            gemImg.src = meta.icon; rarityEl.appendChild(gemImg);
+            gemImg.src = meta.icon;
+            rarityEl.appendChild(gemImg);
         }
         rarityEl.appendChild(document.createTextNode(meta.label));
         info.appendChild(rarityEl);
@@ -640,7 +769,7 @@ function applyFilter(filter) {
     const data = tabData[currentTab];
     data.activeFilter = filter;
     let visibleCount = 0;
-    
+
     for (const item of data.items) {
         let matchesChip = false;
         if (filter === 'all') matchesChip = true;
@@ -650,7 +779,7 @@ function applyFilter(filter) {
         else matchesChip = (item.rarity === filter);
 
         let isVisible = matchesChip && (searchQuery === '' || item.lowerName.includes(searchQuery));
-        
+
         const el = data.cardMap.get(item.originalName);
         if (el) {
             const targetDisplay = isVisible ? '' : 'none';
@@ -665,8 +794,13 @@ function applyFilter(filter) {
     const grid = document.getElementById('sm-whale-grid');
     const emptyState = document.getElementById('sm-whale-empty-state');
     if (grid && emptyState) {
-        if (visibleCount === 0) { grid.style.display = 'none'; emptyState.style.display = 'block'; } 
-        else { grid.style.display = 'grid'; emptyState.style.display = 'none'; }
+        if (visibleCount === 0) {
+            grid.style.display = 'none';
+            emptyState.style.display = 'block';
+        } else {
+            grid.style.display = 'grid';
+            emptyState.style.display = 'none';
+        }
     }
 }
 
@@ -680,16 +814,23 @@ function rebuildFilterChips() {
     const rarityGroups = new Set(data.items.map(s => s.rarity));
     const hasOthers = data.items.some(s => s.rarity === 'kDefault' || s.rarity === 'kNoRarity' || s.rarity === '');
 
-    const chipDefs = [
-        { key: 'all', label: 'All' }
-    ];
+    const chipDefs = [{
+        key: 'all',
+        label: 'All'
+    }];
 
     if (currentTab === 'skins') {
         // chipDefs.push({ key: 'rental', label: 'Shards' });
         RARITY_ORDER.filter(r => rarityGroups.has(r) && r !== '' && r !== 'kDefault' && r !== 'kNoRarity').forEach(r => {
-            chipDefs.push({ key: r, label: getRarityMeta(r).label });
+            chipDefs.push({
+                key: r,
+                label: getRarityMeta(r).label
+            });
         });
-        if (hasOthers) chipDefs.push({ key: 'others', label: 'Others' });
+        if (hasOthers) chipDefs.push({
+            key: 'others',
+            label: 'Others'
+        });
     }
 
     const seenLabels = new Set();
@@ -699,16 +840,19 @@ function rebuildFilterChips() {
 
         const chip = document.createElement('div');
         chip.className = 'sm-whale-filter-chip' + (def.key === data.activeFilter ? ' active' : '');
-        chip.textContent = def.label; chip.dataset.filter = def.key;
-        
+        chip.textContent = def.label;
+        chip.dataset.filter = def.key;
+
         chip.addEventListener('click', () => {
             toolbar.querySelectorAll('.sm-whale-filter-chip').forEach(c => c.classList.remove('active'));
-            chip.classList.add('active'); applyFilter(def.key);
+            chip.classList.add('active');
+            applyFilter(def.key);
         });
-        
-        if (countEl) toolbar.insertBefore(chip, countEl); else toolbar.appendChild(chip);
+
+        if (countEl) toolbar.insertBefore(chip, countEl);
+        else toolbar.appendChild(chip);
     }
-    
+
     if (!chipDefs.some(d => d.key === data.activeFilter)) {
         applyFilter('all');
         const allChip = toolbar.querySelector('[data-filter="all"]');
@@ -729,11 +873,11 @@ function switchTab(tabId) {
     const data = tabData[tabId];
     const subtitle = document.getElementById('sm-whale-subtitle');
     if (subtitle) subtitle.textContent = data.loaded ? data.subtitle : 'Loading...';
-    
+
     const grid = document.getElementById('sm-whale-grid');
     if (!grid) return;
     grid.innerHTML = '';
-    
+
     if (!data.loaded) {
         document.getElementById('sm-whale-toolbar').classList.add('hidden');
         grid.innerHTML = '<div class="sm-whale-status">Fetching data...</div>';
@@ -776,7 +920,7 @@ async function loadTabData(tabId) {
         });
         grid.appendChild(fragment);
 
-        rebuildFilterChips(); 
+        rebuildFilterChips();
         applyFilter(data.activeFilter);
     } catch (err) {
         Utils.Debug.error(`[WhaleHelper] Fetch failed for ${tabId}:`, err);
@@ -790,23 +934,23 @@ async function loadTabData(tabId) {
 async function backgroundSyncData() {
     const data = tabData[currentTab];
     if (!data.loaded) return;
-    
+
     const subtitle = document.getElementById('sm-whale-subtitle');
     if (subtitle) subtitle.textContent = 'Syncing...';
 
     try {
         const newItems = await data.fetcher();
         const activeTabWhenStarted = currentTab;
-        
+
         const oldNames = new Set(data.items.map(s => s.originalName));
         const newNames = new Set(newItems.map(s => s.originalName));
         let changed = false;
 
         data.items = data.items.filter(s => {
             if (!newNames.has(s.originalName)) {
-                data.cardMap.get(s.originalName)?.remove(); 
-                data.cardMap.delete(s.originalName); 
-                changed = true; 
+                data.cardMap.get(s.originalName)?.remove();
+                data.cardMap.delete(s.originalName);
+                changed = true;
                 return false;
             }
             return true;
@@ -817,7 +961,7 @@ async function backgroundSyncData() {
         for (const s of newItems) {
             if (!oldNames.has(s.originalName)) {
                 data.items.push(s);
-                const card = buildCard(s); 
+                const card = buildCard(s);
                 data.cardMap.set(s.originalName, card);
                 if (grid && activeTabWhenStarted === currentTab) {
                     fragment.appendChild(card);
@@ -831,19 +975,19 @@ async function backgroundSyncData() {
 
         if (changed) {
             data.items.sort((a, b) => {
-                const ri = RARITY_ORDER.indexOf(a.rarity || ''); 
+                const ri = RARITY_ORDER.indexOf(a.rarity || '');
                 const rj = RARITY_ORDER.indexOf(b.rarity || '');
-                if (ri !== rj) return ri - rj; 
+                if (ri !== rj) return ri - rj;
                 return a.name.localeCompare(b.name);
             });
             if (grid && activeTabWhenStarted === currentTab) {
                 const sortFragment = document.createDocumentFragment();
-                data.items.forEach(s => { 
-                    const el = data.cardMap.get(s.originalName); 
+                data.items.forEach(s => {
+                    const el = data.cardMap.get(s.originalName);
                     if (el) sortFragment.appendChild(el);
                 });
                 grid.appendChild(sortFragment);
-                rebuildFilterChips(); 
+                rebuildFilterChips();
                 applyFilter(data.activeFilter);
             }
         }
@@ -869,67 +1013,111 @@ function createPanel() {
     const existing = document.getElementById(PANEL_ID);
     if (existing) existing.remove();
 
-    panelEl = document.createElement('div'); panelEl.id = PANEL_ID;
+    panelEl = document.createElement('div');
+    panelEl.id = PANEL_ID;
 
-    const overlay = document.createElement('div'); overlay.id = 'sm-whale-overlay';
-    overlay.addEventListener('click', closePanel); panelEl.appendChild(overlay);
+    const overlay = document.createElement('div');
+    overlay.id = 'sm-whale-overlay';
+    overlay.addEventListener('click', closePanel);
+    panelEl.appendChild(overlay);
 
-    const modal = document.createElement('div'); modal.id = 'sm-whale-modal';
-    const header = document.createElement('div'); header.id = 'sm-whale-modal-header';
+    const modal = document.createElement('div');
+    modal.id = 'sm-whale-modal';
+    const header = document.createElement('div');
+    header.id = 'sm-whale-modal-header';
 
     const titleWrap = document.createElement('div');
-    const title = document.createElement('h2'); title.textContent = 'Whale Helper';
-    const subtitle = document.createElement('div'); subtitle.id = 'sm-whale-subtitle'; subtitle.textContent = 'Loading...';
-    titleWrap.appendChild(title); titleWrap.appendChild(subtitle);
-    
+    const title = document.createElement('h2');
+    title.textContent = 'Whale Helper';
+    const subtitle = document.createElement('div');
+    subtitle.id = 'sm-whale-subtitle';
+    subtitle.textContent = 'Loading...';
+    titleWrap.appendChild(title);
+    titleWrap.appendChild(subtitle);
+
     const headerBtns = document.createElement('div');
     headerBtns.style.cssText = 'display:flex;gap:12px;align-items:center;';
 
     const refreshBtn = document.createElement('button');
-    refreshBtn.innerHTML = '&#x21bb;'; refreshBtn.title = "Refresh Data";
+    refreshBtn.innerHTML = '&#x21bb;';
+    refreshBtn.title = "Refresh Data";
     refreshBtn.style.cssText = 'background:none;border:none;color:#a09b8c;font-size:20px;cursor:pointer;padding:0;line-height:1;transition:color 0.15s;';
     refreshBtn.onmouseover = () => refreshBtn.style.color = '#0ac8b9';
     refreshBtn.onmouseout = () => refreshBtn.style.color = '#a09b8c';
     refreshBtn.addEventListener('click', backgroundSyncData);
 
-    const closeBtn = document.createElement('button'); closeBtn.id = 'sm-whale-close-btn';
-    closeBtn.innerHTML = '&#x2715;'; closeBtn.addEventListener('click', closePanel);
+    const closeBtn = document.createElement('button');
+    closeBtn.id = 'sm-whale-close-btn';
+    closeBtn.innerHTML = '&#x2715;';
+    closeBtn.addEventListener('click', closePanel);
 
-    headerBtns.appendChild(refreshBtn); headerBtns.appendChild(closeBtn);
-    header.appendChild(titleWrap); header.appendChild(headerBtns); modal.appendChild(header);
+    headerBtns.appendChild(refreshBtn);
+    headerBtns.appendChild(closeBtn);
+    header.appendChild(titleWrap);
+    header.appendChild(headerBtns);
+    modal.appendChild(header);
 
-    const body = document.createElement('div'); body.id = 'sm-whale-modal-body';
-    const toolbar = document.createElement('div'); toolbar.id = 'sm-whale-toolbar'; toolbar.classList.add('hidden');
+    const body = document.createElement('div');
+    body.id = 'sm-whale-modal-body';
+    const toolbar = document.createElement('div');
+    toolbar.id = 'sm-whale-toolbar';
+    toolbar.classList.add('hidden');
 
-    const searchWrap = document.createElement('div'); searchWrap.className = 'sm-whale-search-wrapper';
-    const searchInput = document.createElement('input'); searchInput.type = 'text'; searchInput.className = 'sm-whale-search';
-    searchInput.placeholder = 'Search items...'; searchInput.spellcheck = false;
-    
+    const searchWrap = document.createElement('div');
+    searchWrap.className = 'sm-whale-search-wrapper';
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.className = 'sm-whale-search';
+    searchInput.placeholder = 'Search items...';
+    searchInput.spellcheck = false;
+
     searchInput.addEventListener('input', (e) => {
-        searchQuery = e.target.value.toLowerCase().trim(); 
+        searchQuery = e.target.value.toLowerCase().trim();
         applyFilter(tabData[currentTab].activeFilter);
     });
     searchWrap.appendChild(searchInput);
 
-    const countEl = document.createElement('span'); countEl.id = 'sm-whale-count';
-    toolbar.appendChild(countEl); toolbar.appendChild(searchWrap);
+    const countEl = document.createElement('span');
+    countEl.id = 'sm-whale-count';
+    toolbar.appendChild(countEl);
+    toolbar.appendChild(searchWrap);
 
-    const grid = document.createElement('div'); grid.id = 'sm-whale-grid';
-    const emptyState = document.createElement('div'); emptyState.id = 'sm-whale-empty-state';
-    emptyState.className = 'sm-whale-status empty'; emptyState.style.display = 'none';
+    const grid = document.createElement('div');
+    grid.id = 'sm-whale-grid';
+    const emptyState = document.createElement('div');
+    emptyState.id = 'sm-whale-empty-state';
+    emptyState.className = 'sm-whale-status empty';
+    emptyState.style.display = 'none';
     emptyState.textContent = 'No items match this filter.';
 
-    body.appendChild(toolbar); body.appendChild(grid); body.appendChild(emptyState);
-    modal.appendChild(body); 
+    body.appendChild(toolbar);
+    body.appendChild(grid);
+    body.appendChild(emptyState);
+    modal.appendChild(body);
 
     const tabsContainer = document.createElement('div');
     tabsContainer.id = 'sm-whale-tabs-container';
-    
-    const tabs = [
-        { id: 'skins', icon: '/fe/lol-loot/assets/category_icons/skin.png', title: 'Skins' },
-        { id: 'icons', icon: '/fe/lol-loot/assets/category_icons/summonericon.png', title: 'Icons' },
-        { id: 'wards', icon: '/fe/lol-loot/assets/category_icons/wardskin.png', title: 'Wards' },
-        { id: 'emotes', icon: '/fe/lol-loot/assets/category_icons/emote.png', title: 'Emotes' }
+
+    const tabs = [{
+            id: 'skins',
+            icon: '/fe/lol-loot/assets/category_icons/skin.png',
+            title: 'Skins'
+        },
+        {
+            id: 'icons',
+            icon: '/fe/lol-loot/assets/category_icons/summonericon.png',
+            title: 'Icons'
+        },
+        {
+            id: 'wards',
+            icon: '/fe/lol-loot/assets/category_icons/wardskin.png',
+            title: 'Wards'
+        },
+        {
+            id: 'emotes',
+            icon: '/fe/lol-loot/assets/category_icons/emote.png',
+            title: 'Emotes'
+        }
     ];
 
     tabs.forEach(t => {
@@ -940,7 +1128,7 @@ function createPanel() {
         const img = document.createElement('img');
         img.src = t.icon;
         btn.appendChild(img);
-        
+
         btn.addEventListener('click', () => {
             if (currentTab !== t.id) switchTab(t.id);
         });
@@ -951,7 +1139,8 @@ function createPanel() {
     panelEl.appendChild(modal);
 
     const viewportOverlay = document.querySelector('.rcp-fe-viewport-overlay');
-    if (viewportOverlay?.parentNode === document.body) viewportOverlay.after(panelEl); else document.body.appendChild(panelEl);
+    if (viewportOverlay?.parentNode === document.body) viewportOverlay.after(panelEl);
+    else document.body.appendChild(panelEl);
 }
 
 function injectButton(actionTabsContainer) {
@@ -959,16 +1148,19 @@ function injectButton(actionTabsContainer) {
     if (actionTabsContainer.querySelector(`#${BTN_ID}`)) return;
 
     const btn = document.createElement('div');
-    btn.id = BTN_ID; btn.setAttribute(BTN_ATTR, 'true'); btn.title = 'Whale Helper — skins you don\'t own yet';
+    btn.id = BTN_ID;
+    btn.setAttribute(BTN_ATTR, 'true');
+    btn.title = 'Whale Helper — skins you don\'t own yet';
 
     btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="-5.0 -10.0 110.0 135.0">
-	 <path d="m93.117 34.301c-0.14453-0.89453-0.85547-1.5859-1.7539-1.7031-0.89844-0.11719-1.7617 0.37109-2.1289 1.1992-0.82422 1.8594-2.5234 2.2031-5.4492 2.6602-2.7617 0.14453-5.3984 1.2148-7.4805 3.0391-1.6914-1.9023-3.8398-3.3438-6.2461-4.1875-2.2305-0.69531-4.1367-2.1758-5.3633-4.1641-0.54297-0.83203-1.5234-1.2578-2.5-1.0898-0.99609 0.16797-1.7891 0.91406-2.0234 1.8906-1.0391 4.3945-1.5508 9.5117 2.5469 14.152v0.003906c2.0859 2.2344 4.6094 4.0156 7.4141 5.2383 0.21094 0.085937 0.32813 0.32031 0.26953 0.54297-0.066406 0.28125-0.17969 0.54688-0.33594 0.79297-1.1797 1.4453-3 2.207-4.8594 2.0352-1.9336-0.17578-3.0977-1.7109-5.1562-4.6445-0.76562-1.0898-1.6328-2.3281-2.6641-3.5742-4.3789-5.2969-10.156-9.2617-16.676-11.445-2.4922-0.77344-15.43-4.1992-25.336 4.4336-6.1797 5.5586-9.4023 13.691-8.6992 21.973 0.10547 1.1562 0.29688 2.3047 0.57031 3.4336 0.015625 0.074219 0.03125 0.14844 0.054687 0.21875 0.98047 4.6328 3.7695 8.6797 7.75 11.246 4.0352 2.2773 8.4141 3.875 12.965 4.7305 3.0273 3.7695 7.6445 5.9141 12.477 5.7852h0.023437c1.0469 0.007812 2-0.61328 2.4141-1.5781 0.41406-0.96484 0.20703-2.082-0.51953-2.8359 1.3945-0.019531 2.7852-0.082031 4.1602-0.19922 3.6641 1.7031 7.668 2.5469 11.703 2.4688h0.10937c1.0273 0 1.9453-0.63672 2.3086-1.5938 0.37891-0.97656 0.11328-2.082-0.66406-2.7812-0.26172-0.23828-0.49219-0.47656-0.71094-0.71484 5.7383-1.8398 10.832-5.2852 14.672-9.9297 1.543-1.9609 2.8164-4.1211 3.7852-6.418 0.011718-0.019531 0.015624-0.039062 0.027343-0.058594h-0.003906c1.4297-3.4297 2.293-7.0664 2.5586-10.77 0.03125-0.37109 0.29688-0.67969 0.66016-0.75781 3.3359-0.61328 6.4688-2.0508 9.1055-4.1836 3.8086-3.7539 3.5117-9.8906 2.9961-13.215zm-59.426 47.715c1.5781 0.18359 3.1758 0.30469 4.7812 0.375 0.25781 0.45312 0.54688 0.89062 0.86719 1.3008-1.9805-0.14062-3.9102-0.71094-5.6484-1.6758zm-4.4883-3.8516-0.011719-0.003906c-4.3945-0.77734-8.6289-2.2891-12.52-4.4766v-0.003906c-2.5273-1.5938-4.4688-3.9609-5.5352-6.75 2.7344 0.79297 5.5703 1.1914 8.4219 1.1875 3.3477-0.011719 6.6719-0.53516 9.8594-1.5625 0.70703 0.12109 1.4062 0.28125 2.0977 0.47656 2.0625 0.60938 4 1.582 5.7148 2.875 0.52734 3.6328 2.3008 6.9648 5.0156 9.4336-4.3789 0.0625-8.75-0.33203-13.043-1.1758zm28.324-1.2305c-0.26172-0.53125-0.50781-1.082-0.76953-1.6758-0.22656-0.50781-0.46094-1.0352-0.71875-1.5742 0.57813-0.125 1.168-0.25781 1.7852-0.39453 4.8281-1.0977 9.4531-2.957 13.699-5.5078-3.6641 4.3633-8.5312 7.5469-13.996 9.1523zm30.398-31.645c-2.2266 1.7148-4.8359 2.8672-7.6016 3.3633-1.7031 0.37891-2.957 1.8281-3.082 3.5703-0.22656 3.1953-0.94141 6.3359-2.1172 9.3125-5.2734 4.2148-11.422 7.1914-18 8.7109-0.94141 0.21094-1.8242 0.40234-2.6797 0.58203-1.0508-1.5898-2.2969-3.043-3.707-4.3281-0.30078-0.28125-0.70703-0.42969-1.1211-0.41406-0.41406 0.015624-0.80469 0.19531-1.0859 0.5-0.28125 0.30078-0.42969 0.70703-0.41406 1.1211 0.015624 0.41406 0.19531 0.80469 0.5 1.0859 2.3359 2.1328 4.1445 4.7773 5.2812 7.7305 0.46875 1.1133 1.7461 2.2852 2.5156 3.3828 2.1289 3.0312 3.9648 5.6484 7.4375 5.9609 2.9883 0.29297 5.9102-0.98828 7.7148-3.3867 0.36328-0.53906 0.625-1.1406 0.78125-1.7695 0.45312-1.7148-0.42188-3.5039-2.0547-4.1992-2.3828-1.0352-4.5312-2.543-6.3125-4.4375-2.3125-2.6172-2.9648-5.5781-2.1406-10h0.003906c1.543 1.9258 3.6055 3.3711 5.9414 4.1641 2.5391 0.85547 4.7227 2.5352 6.2031 4.7734 0.3125 0.43359 0.82422 0.68359 1.3633 0.66016 0.53516-0.03125 1.0195-0.33594 1.2812-0.80859 1.3633-2.4727 3.7656-2.8438 6.5508-3.2773v0.003906c2.1602-0.14062 4.2383-0.85547 6.0273-2.0664 0.085938 2.6328-0.32422 5.8008-2.3633 7.8086z"/>
-	 <path d="m32.402 57.078c0 2.6055-3.9062 2.6055-3.9062 0s3.9062-2.6055 3.9062 0"/>
-	 <path d="m29.414 22.188c0.33594 0.042969 0.66406 0.125 0.98047 0.24219 0.47656 0.19141 1.1602 0.62891 2.2539 2.3242 0.79297 1.3008 1.3789 2.7188 1.7383 4.1992 0.19531 0.66406 0.80469 1.1211 1.4961 1.1211 0.042969 0 0.082032 0 0.125-0.003907 0.0625-0.011718 0.125-0.027343 0.18359-0.046874 0.058594 0.019531 0.12109 0.035156 0.18359 0.046874 0.042969 0.003907 0.082031 0.003907 0.125 0.003907 0.69141 0 1.3008-0.45703 1.4961-1.1211 0.35938-1.4805 0.94531-2.8984 1.7383-4.1992 1.0898-1.6953 1.7773-2.1328 2.25-2.3242 0.32031-0.11719 0.65234-0.19922 0.98828-0.24219 0.89453-0.078125 1.7383-0.46094 2.3867-1.0859 1.3047-1.2773 1.6211-3.2578 0.78125-4.8789-0.96875-2.0352-3.0977-3.2539-5.3438-3.0664-2.0391 0.28125-3.7891 1.6094-4.6055 3.5039-0.81641-1.8945-2.5664-3.2227-4.6055-3.5039-2.2461-0.18359-4.3711 1.0391-5.3438 3.0664-0.83984 1.6211-0.52344 3.6016 0.78125 4.8789 0.64844 0.625 1.4922 1.0078 2.3906 1.0859zm8.6797-1.7461c0.63672-2.5234 1.7383-4.0469 3.0156-4.1758 0.058594-0.003906 0.11719-0.007813 0.17578-0.007813h0.003906c0.86328 0.042969 1.6406 0.54297 2.0312 1.3164 0.26953 0.42969 0.19141 0.99219-0.1875 1.3359-0.082031 0.082032-0.15234 0.10938-0.67187 0.19531-0.5625 0.078125-1.1133 0.21875-1.6445 0.42578-1.1992 0.53516-2.2305 1.3906-2.9727 2.4727 0.042969-0.52734 0.12891-1.0469 0.25-1.5625zm-9.0312-2.8672c0.39062-0.77344 1.168-1.2734 2.0352-1.3164 0.058594 0 0.11719 0.003907 0.17578 0.007813 1.2812 0.12891 2.3789 1.6484 3.0156 4.1758 0.12109 0.51562 0.20703 1.0352 0.25 1.5625-0.74219-1.082-1.7734-1.9375-2.9727-2.4727-0.53125-0.20703-1.082-0.35156-1.6445-0.42578-0.51953-0.085938-0.59375-0.11328-0.67188-0.19531-0.37891-0.34375-0.45703-0.90625-0.1875-1.3359z"/>
-	</svg>`;
+     <path d="m93.117 34.301c-0.14453-0.89453-0.85547-1.5859-1.7539-1.7031-0.89844-0.11719-1.7617 0.37109-2.1289 1.1992-0.82422 1.8594-2.5234 2.2031-5.4492 2.6602-2.7617 0.14453-5.3984 1.2148-7.4805 3.0391-1.6914-1.9023-3.8398-3.3438-6.2461-4.1875-2.2305-0.69531-4.1367-2.1758-5.3633-4.1641-0.54297-0.83203-1.5234-1.2578-2.5-1.0898-0.99609 0.16797-1.7891 0.91406-2.0234 1.8906-1.0391 4.3945-1.5508 9.5117 2.5469 14.152v0.003906c2.0859 2.2344 4.6094 4.0156 7.4141 5.2383 0.21094 0.085937 0.32813 0.32031 0.26953 0.54297-0.066406 0.28125-0.17969 0.54688-0.33594 0.79297-1.1797 1.4453-3 2.207-4.8594 2.0352-1.9336-0.17578-3.0977-1.7109-5.1562-4.6445-0.76562-1.0898-1.6328-2.3281-2.6641-3.5742-4.3789-5.2969-10.156-9.2617-16.676-11.445-2.4922-0.77344-15.43-4.1992-25.336 4.4336-6.1797 5.5586-9.4023 13.691-8.6992 21.973 0.10547 1.1562 0.29688 2.3047 0.57031 3.4336 0.015625 0.074219 0.03125 0.14844 0.054687 0.21875 0.98047 4.6328 3.7695 8.6797 7.75 11.246 4.0352 2.2773 8.4141 3.875 12.965 4.7305 3.0273 3.7695 7.6445 5.9141 12.477 5.7852h0.023437c1.0469 0.007812 2-0.61328 2.4141-1.5781 0.41406-0.96484 0.20703-2.082-0.51953-2.8359 1.3945-0.019531 2.7852-0.082031 4.1602-0.19922 3.6641 1.7031 7.668 2.5469 11.703 2.4688h0.10937c1.0273 0 1.9453-0.63672 2.3086-1.5938 0.37891-0.97656 0.11328-2.082-0.66406-2.7812-0.26172-0.23828-0.49219-0.47656-0.71094-0.71484 5.7383-1.8398 10.832-5.2852 14.672-9.9297 1.543-1.9609 2.8164-4.1211 3.7852-6.418 0.011718-0.019531 0.015624-0.039062 0.027343-0.058594h-0.003906c1.4297-3.4297 2.293-7.0664 2.5586-10.77 0.03125-0.37109 0.29688-0.67969 0.66016-0.75781 3.3359-0.61328 6.4688-2.0508 9.1055-4.1836 3.8086-3.7539 3.5117-9.8906 2.9961-13.215zm-59.426 47.715c1.5781 0.18359 3.1758 0.30469 4.7812 0.375 0.25781 0.45312 0.54688 0.89062 0.86719 1.3008-1.9805-0.14062-3.9102-0.71094-5.6484-1.6758zm-4.4883-3.8516-0.011719-0.003906c-4.3945-0.77734-8.6289-2.2891-12.52-4.4766v-0.003906c-2.5273-1.5938-4.4688-3.9609-5.5352-6.75 2.7344 0.79297 5.5703 1.1914 8.4219 1.1875 3.3477-0.011719 6.6719-0.53516 9.8594-1.5625 0.70703 0.12109 1.4062 0.28125 2.0977 0.47656 2.0625 0.60938 4 1.582 5.7148 2.875 0.52734 3.6328 2.3008 6.9648 5.0156 9.4336-4.3789 0.0625-8.75-0.33203-13.043-1.1758zm28.324-1.2305c-0.26172-0.53125-0.50781-1.082-0.76953-1.6758-0.22656-0.50781-0.46094-1.0352-0.71875-1.5742 0.57813-0.125 1.168-0.25781 1.7852-0.39453 4.8281-1.0977 9.4531-2.957 13.699-5.5078-3.6641 4.3633-8.5312 7.5469-13.996 9.1523zm30.398-31.645c-2.2266 1.7148-4.8359 2.8672-7.6016 3.3633-1.7031 0.37891-2.957 1.8281-3.082 3.5703-0.22656 3.1953-0.94141 6.3359-2.1172 9.3125-5.2734 4.2148-11.422 7.1914-18 8.7109-0.94141 0.21094-1.8242 0.40234-2.6797 0.58203-1.0508-1.5898-2.2969-3.043-3.707-4.3281-0.30078-0.28125-0.70703-0.42969-1.1211-0.41406-0.41406 0.015624-0.80469 0.19531-1.0859 0.5-0.28125 0.30078-0.42969 0.70703-0.41406 1.1211 0.015624 0.41406 0.19531 0.80469 0.5 1.0859 2.3359 2.1328 4.1445 4.7773 5.2812 7.7305 0.46875 1.1133 1.7461 2.2852 2.5156 3.3828 2.1289 3.0312 3.9648 5.6484 7.4375 5.9609 2.9883 0.29297 5.9102-0.98828 7.7148-3.3867 0.36328-0.53906 0.625-1.1406 0.78125-1.7695 0.45312-1.7148-0.42188-3.5039-2.0547-4.1992-2.3828-1.0352-4.5312-2.543-6.3125-4.4375-2.3125-2.6172-2.9648-5.5781-2.1406-10h0.003906c1.543 1.9258 3.6055 3.3711 5.9414 4.1641 2.5391 0.85547 4.7227 2.5352 6.2031 4.7734 0.3125 0.43359 0.82422 0.68359 1.3633 0.66016 0.53516-0.03125 1.0195-0.33594 1.2812-0.80859 1.3633-2.4727 3.7656-2.8438 6.5508-3.2773v0.003906c2.1602-0.14062 4.2383-0.85547 6.0273-2.0664 0.085938 2.6328-0.32422 5.8008-2.3633 7.8086z"/>
+     <path d="m32.402 57.078c0 2.6055-3.9062 2.6055-3.9062 0s3.9062-2.6055 3.9062 0"/>
+     <path d="m29.414 22.188c0.33594 0.042969 0.66406 0.125 0.98047 0.24219 0.47656 0.19141 1.1602 0.62891 2.2539 2.3242 0.79297 1.3008 1.3789 2.7188 1.7383 4.1992 0.19531 0.66406 0.80469 1.1211 1.4961 1.1211 0.042969 0 0.082032 0 0.125-0.003907 0.0625-0.011718 0.125-0.027343 0.18359-0.046874 0.058594 0.019531 0.12109 0.035156 0.18359 0.046874 0.042969 0.003907 0.082031 0.003907 0.125 0.003907 0.69141 0 1.3008-0.45703 1.4961-1.1211 0.35938-1.4805 0.94531-2.8984 1.7383-4.1992 1.0898-1.6953 1.7773-2.1328 2.25-2.3242 0.32031-0.11719 0.65234-0.19922 0.98828-0.24219 0.89453-0.078125 1.7383-0.46094 2.3867-1.0859 1.3047-1.2773 1.6211-3.2578 0.78125-4.8789-0.96875-2.0352-3.0977-3.2539-5.3438-3.0664-2.0391 0.28125-3.7891 1.6094-4.6055 3.5039-0.81641-1.8945-2.5664-3.2227-4.6055-3.5039-2.2461-0.18359-4.3711 1.0391-5.3438 3.0664-0.83984 1.6211-0.52344 3.6016 0.78125 4.8789 0.64844 0.625 1.4922 1.0078 2.3906 1.0859zm8.6797-1.7461c0.63672-2.5234 1.7383-4.0469 3.0156-4.1758 0.058594-0.003906 0.11719-0.007813 0.17578-0.007813h0.003906c0.86328 0.042969 1.6406 0.54297 2.0312 1.3164 0.26953 0.42969 0.19141 0.99219-0.1875 1.3359-0.082031 0.082032-0.15234 0.10938-0.67187 0.19531-0.5625 0.078125-1.1133 0.21875-1.6445 0.42578-1.1992 0.53516-2.2305 1.3906-2.9727 2.4727 0.042969-0.52734 0.12891-1.0469 0.25-1.5625zm-9.0312-2.8672c0.39062-0.77344 1.168-1.2734 2.0352-1.3164 0.058594 0 0.11719 0.003907 0.17578 0.007813 1.2812 0.12891 2.3789 1.6484 3.0156 4.1758 0.12109 0.51562 0.20703 1.0352 0.25 1.5625-0.74219-1.082-1.7734-1.9375-2.9727-2.4727-0.53125-0.20703-1.082-0.35156-1.6445-0.42578-0.51953-0.085938-0.59375-0.11328-0.67188-0.19531-0.37891-0.34375-0.45703-0.90625-0.1875-1.3359z"/>
+    </svg>`;
 
     btn.addEventListener('click', (e) => {
-        e.preventDefault(); e.stopPropagation();
+        e.preventDefault();
+        e.stopPropagation();
         if (!isLootEnabled) return;
         openPanel();
     });
@@ -985,10 +1177,12 @@ function removeButton() {
 async function showOddsModal(item, recipeName) {
     try {
         const sessionToken = await Utils.LCU.get('/lol-league-session/v1/league-session-token');
-        const { commonBase } = await Utils.GameData.getSgpContext();
-        
+        const {
+            commonBase
+        } = await Utils.GameData.getSgpContext();
+
         Utils.Debug.log("[WhaleHelper Debug] Fetching SGP odds from:", `${commonBase}/loot/v2/recipes/${recipeName}/odds`);
-        
+
         const resp = await fetch(`${commonBase}/loot/v2/recipes/${recipeName}/odds`, {
             headers: {
                 'Authorization': `Bearer ${sessionToken}`,
@@ -1003,28 +1197,34 @@ async function showOddsModal(item, recipeName) {
         if (odds) {
             renderOddsModal(item, odds);
         } else {
-            renderOddsModal(item, { message: "Drop rates are currently unavailable for this item." });
+            renderOddsModal(item, {
+                message: "Drop rates are currently unavailable for this item."
+            });
         }
     } catch (e) {
         Utils.Debug.error("[WhaleHelper] Failed to fetch SGP odds:", e);
-        renderOddsModal(item, { message: "Drop rates are not published for this item." });
+        renderOddsModal(item, {
+            message: "Drop rates are not published for this item."
+        });
     }
-}function flattenOddsTree(node, currentRate = 1) {
+}
+
+function flattenOddsTree(node, currentRate = 1) {
     const results = [];
     const rate = currentRate * (node.dropRate !== undefined ? node.dropRate : 1);
-    
+
     const isBundle = node.lootId && node.lootId.startsWith('LOOTBUNDLE_');
-    
+
     if (isBundle && node.children && node.children.length > 0) {
         const childLabels = node.children.map(child => {
             return parseQueryToFriendlyLabel(child.label || child.lootId, child.quantity || 1);
         });
-        
+
         const counts = {};
         childLabels.forEach(l => {
             counts[l] = (counts[l] || 0) + 1;
         });
-        
+
         const groupedLabels = [];
         for (const [l, c] of Object.entries(counts)) {
             if (c > 1) {
@@ -1063,9 +1263,9 @@ async function showOddsModal(item, recipeName) {
 function parseQueryToFriendlyLabel(raw, quantity) {
     raw = String(raw || '').trim();
     if (!raw) return 'Unknown Item';
-    
+
     let isSpecific = false;
-    
+
     if (raw.includes("lootName == 'CURRENCY_mythic'") || raw.includes("CURRENCY_mythic")) {
         return quantity > 1 ? quantity + " Mythic Essence" : "Mythic Essence";
     }
@@ -1154,7 +1354,7 @@ function parseQueryToFriendlyLabel(raw, quantity) {
 
     const sortedTypes = ['SKIN', 'SKIN_RENTAL', 'WARDSKIN', 'WARDSKIN_RENTAL', 'CHAMPION', 'CHAMPION_RENTAL', 'EMOTE', 'SUMMONERICON', 'CHROMA'];
     const cleanedTypes = [];
-    
+
     for (const t of sortedTypes) {
         if (types.includes(t)) {
             cleanedTypes.push(typeMap[t]);
@@ -1179,7 +1379,7 @@ function parseQueryToFriendlyLabel(raw, quantity) {
 
     const hasSkinRental = types.includes('SKIN_RENTAL');
     const hasSkinPermanent = types.includes('SKIN');
-    
+
     if (hasSkinRental && hasSkinPermanent && values.includes(3250) && !isExclusive && !isMythic && !isExalted && !isTranscendent) {
         if (values.includes(520) && values.includes(1350) && values.includes(1820)) {
             return prefix + "Skin Shard (520-1820 RP) or Ultimate Skin";
@@ -1208,17 +1408,17 @@ function parseQueryToFriendlyLabel(raw, quantity) {
             520: '520 RP',
             390: '390 RP'
         };
-        const matchedVals = values.filter(v => rpLabels[v]).sort((a,b)=>a-b);
+        const matchedVals = values.filter(v => rpLabels[v]).sort((a, b) => a - b);
         if (matchedVals.length > 2) {
             let minLabel = matchedVals[0] + " RP";
             if (matchedVals[0] === 1350) minLabel = "Epic";
             else if (matchedVals[0] === 1820) minLabel = "Legendary";
-            
+
             let maxLabel = matchedVals[matchedVals.length - 1] + " RP";
             if (matchedVals[matchedVals.length - 1] === 1350) maxLabel = "Epic";
             else if (matchedVals[matchedVals.length - 1] === 1820) maxLabel = "Legendary";
             else if (matchedVals[matchedVals.length - 1] === 3250 || matchedVals[matchedVals.length - 1] === 2775) maxLabel = "Ultimate";
-            
+
             if (minLabel === maxLabel) suffix = " (" + minLabel + ")";
             else suffix = " (" + minLabel + " - " + maxLabel + ")";
         } else if (matchedVals.length > 0) {
@@ -1234,7 +1434,7 @@ function parseQueryToFriendlyLabel(raw, quantity) {
                 675: '1350 BE',
                 225: '450 BE'
             };
-            const matchedVals = values.filter(v => beLabels[v]).sort((a,b)=>a-b);
+            const matchedVals = values.filter(v => beLabels[v]).sort((a, b) => a - b);
             if (matchedVals.length > 2) {
                 suffix = ` (${beLabels[matchedVals[0]]} - ${beLabels[matchedVals[matchedVals.length-1]]})`;
             } else if (matchedVals.length > 0) {
@@ -1246,7 +1446,7 @@ function parseQueryToFriendlyLabel(raw, quantity) {
     }
 
     let label = prefix + exclusivity + baseType + suffix;
-    
+
     if ((isExclusive || isMythic || isExalted || isTranscendent) && types.length > 2) {
         label = prefix + (exclusivity || 'Mythic/Exclusive ') + "Drop (" + baseType + ")";
     }
@@ -1264,24 +1464,28 @@ function parseQueryToFriendlyLabel(raw, quantity) {
 
 function parseOddsList(list) {
     const map = new Map();
-    
+
     const flattened = [];
     for (const topNode of list) {
         flattened.push(...flattenOddsTree(topNode, 1));
     }
-    
+
     for (const leaf of flattened) {
         const label = leaf.label;
         const rate = leaf.rate * 100;
-        
+
         if (map.has(label)) {
             map.get(label).rate += rate;
             map.get(label).itemsCount += 1;
         } else {
-            map.set(label, { label, rate: rate, itemsCount: 1 });
+            map.set(label, {
+                label,
+                rate: rate,
+                itemsCount: 1
+            });
         }
     }
-    
+
     return Array.from(map.values()).sort((a, b) => b.rate - a.rate);
 }
 
@@ -1306,14 +1510,14 @@ function colorizeRPAndTiers(text) {
         essence: '#0ac8b9',
         orange: '#e8a040'
     };
-    
+
     let result = text;
-    
+
     function safeReplace(str, pattern, color) {
         const regex = new RegExp('(?![^<]*>)' + pattern, 'gi');
         return str.replace(regex, `<span style="color:${color}; font-weight:bold;">$&</span>`);
     }
-    
+
     result = safeReplace(result, '\\b(Ultimate|3250\\s*RP|3250|2775\\s*RP|2775)\\b', colors.ultimate);
     result = safeReplace(result, '\\b(Legendary|1820\\s*RP|1820|1850\\s*RP|1850)\\b', colors.legendary);
     result = safeReplace(result, '\\b(Epic|1350\\s*RP|1350)\\b', colors.epic);
@@ -1321,7 +1525,7 @@ function colorizeRPAndTiers(text) {
     result = safeReplace(result, '\\b(Mythic|Exclusive|Transcendent|Exalted)\\b', colors.mythic);
     result = safeReplace(result, '\\b(Blue Essence)\\b', colors.essence);
     result = safeReplace(result, '\\b(Orange Essence)\\b', colors.orange);
-    
+
     return result;
 }
 
@@ -1334,10 +1538,10 @@ function formatEntry(entry) {
     } else {
         rateStr = `<span style="color:#0ac8b9; font-weight:bold;">${entry.rate.toFixed(2)}%</span>`;
     }
-    
+
     const coloredLabel = colorizeRPAndTiers(entry.label);
     const poolInfo = entry.itemsCount > 3 ? `<span style="color:#746e64; margin-left:6px; font-size:11px;">(Pool of ${entry.itemsCount} items)</span>` : '';
-    
+
     return `<div class="odds-row" style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.03); font-size:13px; transition: background 0.2s;">
         <div style="display:flex; align-items:center; flex-wrap:wrap; gap:4px;"><span style="color:#f0e6d2;">${coloredLabel}</span>${poolInfo}</div>
         <div style="white-space:nowrap; margin-left:12px;">${rateStr}</div>
@@ -1351,35 +1555,86 @@ function renderOddsModal(item, odds) {
     const root = document.createElement('div');
     root.id = modalId;
     Object.assign(root.style, {
-        position: 'fixed', inset: 0, zIndex: 2147483647, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(3px)'
+        position: 'fixed',
+        inset: 0,
+        zIndex: 2147483647,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(0,0,0,0.45)',
+        backdropFilter: 'blur(3px)'
     });
 
     const modal = document.createElement('div');
     Object.assign(modal.style, {
-        width: '630px', maxHeight: '85vh', backgroundColor: 'rgba(1, 10, 19, 0.75)', border: '1px solid rgba(200, 170, 110, 0.2)', borderRadius: '12px', display: 'flex', flexDirection: 'column', boxShadow: '0 16px 48px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.05)', backdropFilter: 'blur(25px) saturate(140%)', overflow: 'hidden', color: '#a09b8c', fontFamily: 'var(--font-body), "Segoe UI", sans-serif'
+        width: '630px',
+        maxHeight: '85vh',
+        backgroundColor: 'rgba(1, 10, 19, 0.75)',
+        border: '1px solid rgba(200, 170, 110, 0.2)',
+        borderRadius: '12px',
+        display: 'flex',
+        flexDirection: 'column',
+        boxShadow: '0 16px 48px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+        backdropFilter: 'blur(25px) saturate(140%)',
+        overflow: 'hidden',
+        color: '#a09b8c',
+        fontFamily: 'var(--font-body), "Segoe UI", sans-serif'
     });
 
     const header = document.createElement('div');
-    Object.assign(header.style, { padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(0,0,0,0.2)' });
+    Object.assign(header.style, {
+        padding: '20px 24px',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: 'rgba(0,0,0,0.2)'
+    });
 
     const titleWrap = document.createElement('div');
-    Object.assign(titleWrap.style, { display: 'flex', alignItems: 'center', gap: '12px' });
-    
+    Object.assign(titleWrap.style, {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px'
+    });
+
     if (item.tilePath) {
         const img = document.createElement('img');
         img.src = item.tilePath;
-        Object.assign(img.style, { width: '32px', height: '32px', objectFit: 'contain', borderRadius: '4px', border: '1px solid rgba(200, 170, 110, 0.2)' });
+        Object.assign(img.style, {
+            width: '32px',
+            height: '32px',
+            objectFit: 'contain',
+            borderRadius: '4px',
+            border: '1px solid rgba(200, 170, 110, 0.2)'
+        });
         titleWrap.appendChild(img);
     }
-    
+
     const title = document.createElement('div');
     title.textContent = item.itemDesc || item.localizedName || item.name || 'Loot Odds';
-    Object.assign(title.style, { color: '#f0e6d2', fontWeight: 'bold', fontSize: '18px', textTransform: 'uppercase', letterSpacing: '1px' });
+    Object.assign(title.style, {
+        color: '#f0e6d2',
+        fontWeight: 'bold',
+        fontSize: '18px',
+        textTransform: 'uppercase',
+        letterSpacing: '1px'
+    });
     titleWrap.appendChild(title);
 
     const closeBtn = document.createElement('button');
     closeBtn.innerHTML = '&#x2715;';
-    Object.assign(closeBtn.style, { background: 'none', border: 'none', color: '#a09b8c', fontSize: '24px', cursor: 'pointer', padding: '0', lineHeight: '1', transition: 'color 0.15s', outline: 'none' });
+    Object.assign(closeBtn.style, {
+        background: 'none',
+        border: 'none',
+        color: '#a09b8c',
+        fontSize: '24px',
+        cursor: 'pointer',
+        padding: '0',
+        lineHeight: '1',
+        transition: 'color 0.15s',
+        outline: 'none'
+    });
     closeBtn.onmouseover = () => closeBtn.style.color = '#f0e6d2';
     closeBtn.onmouseout = () => closeBtn.style.color = '#a09b8c';
     closeBtn.onclick = () => root.remove();
@@ -1388,7 +1643,10 @@ function renderOddsModal(item, odds) {
     header.appendChild(closeBtn);
 
     const body = document.createElement('div');
-    Object.assign(body.style, { padding: '24px', overflowY: 'auto' });
+    Object.assign(body.style, {
+        padding: '24px',
+        overflowY: 'auto'
+    });
 
     const css = document.createElement('style');
     css.textContent = `
@@ -1403,7 +1661,13 @@ function renderOddsModal(item, odds) {
     if (odds.message) {
         const msgEl = document.createElement('div');
         msgEl.textContent = odds.message;
-        Object.assign(msgEl.style, { color: '#746e64', fontSize: '13px', fontStyle: 'italic', textAlign: 'center', margin: '40px 0' });
+        Object.assign(msgEl.style, {
+            color: '#746e64',
+            fontSize: '13px',
+            fontStyle: 'italic',
+            textAlign: 'center',
+            margin: '40px 0'
+        });
         body.appendChild(msgEl);
     } else {
         const guaranteed = parseOddsList(odds.guaranteedToContain || []);
@@ -1412,13 +1676,24 @@ function renderOddsModal(item, odds) {
         if (guaranteed.length > 0) {
             const gTitle = document.createElement('div');
             gTitle.textContent = 'Guaranteed Drops';
-            Object.assign(gTitle.style, { color: '#c8aa6e', fontWeight: 'bold', fontSize: '14px', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' });
+            Object.assign(gTitle.style, {
+                color: '#c8aa6e',
+                fontWeight: 'bold',
+                fontSize: '14px',
+                marginBottom: '8px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+            });
             body.appendChild(gTitle);
 
             const gList = document.createElement('div');
             gList.innerHTML = formatOddsList(guaranteed);
             Object.assign(gList.style, {
-                marginBottom: '20px', background: 'rgba(255,255,255,0.015)', padding: '12px 16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)'
+                marginBottom: '20px',
+                background: 'rgba(255,255,255,0.015)',
+                padding: '12px 16px',
+                borderRadius: '8px',
+                border: '1px solid rgba(255,255,255,0.03)'
             });
             body.appendChild(gList);
         }
@@ -1426,13 +1701,24 @@ function renderOddsModal(item, odds) {
         if (chance.length > 0) {
             const cTitle = document.createElement('div');
             cTitle.textContent = 'Bonus Chances';
-            Object.assign(cTitle.style, { color: '#c8aa6e', fontWeight: 'bold', fontSize: '14px', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' });
+            Object.assign(cTitle.style, {
+                color: '#c8aa6e',
+                fontWeight: 'bold',
+                fontSize: '14px',
+                marginBottom: '8px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+            });
             body.appendChild(cTitle);
 
             const cList = document.createElement('div');
             cList.innerHTML = formatOddsList(chance);
             Object.assign(cList.style, {
-                marginBottom: '16px', background: 'rgba(255,255,255,0.015)', padding: '12px 16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)'
+                marginBottom: '16px',
+                background: 'rgba(255,255,255,0.015)',
+                padding: '12px 16px',
+                borderRadius: '8px',
+                border: '1px solid rgba(255,255,255,0.03)'
             });
             body.appendChild(cList);
         }
@@ -1446,7 +1732,7 @@ function renderOddsModal(item, odds) {
         flagsContainer.style.gap = '16px';
         flagsContainer.style.marginTop = '16px';
         flagsContainer.style.marginBottom = '8px';
-        
+
         const iconFilter = 'invert(66%) sepia(9%) saturate(415%) hue-rotate(3deg) brightness(93%) contrast(88%)';
         if (pityActive !== undefined) {
             const pity = document.createElement('div');
@@ -1479,7 +1765,9 @@ function renderOddsModal(item, odds) {
     modal.appendChild(body);
     root.appendChild(modal);
 
-    root.onclick = (e) => { if (e.target === root) root.remove(); };
+    root.onclick = (e) => {
+        if (e.target === root) root.remove();
+    };
 
     document.body.appendChild(root);
 }
@@ -1502,9 +1790,9 @@ function installContextMenuInterceptors() {
                 if (openAction) {
                     activeRecipeName = openAction.name;
                     activeItemName = openAction.recipeDescription || openAction.recipeContextMenuAction || "Loot Item";
-                    
+
                     Utils.Debug.log("[WhaleHelper Debug] Intercepted context-menu response for openable item. Recipe:", activeRecipeName);
-                    
+
                     data.push({
                         actionType: "VIEW_ODDS", // VIEW_ODDS
                         enabled: true,
@@ -1539,20 +1827,22 @@ function installClickCapture() {
         menu.addEventListener('click', (e) => {
             const path = e.composedPath() || [];
             const item = path.find(el => el && el.classList && el.classList.contains('context-menu-item'));
-            
+
             if (item && (item.textContent.includes('View Drop Rates') || item.textContent.includes('View'))) {
                 Utils.Debug.log("[WhaleHelper Debug] Captured click on View Drop Rates. Opening modal for recipe:", activeRecipeName);
                 e.preventDefault();
                 e.stopPropagation();
-                
+
                 if (typeof menu.close === 'function') {
                     menu.close();
                 } else {
                     menu.remove();
                 }
-                
+
                 if (activeRecipeName) {
-                    showOddsModal({ name: activeItemName }, activeRecipeName);
+                    showOddsModal({
+                        name: activeItemName
+                    }, activeRecipeName);
                 }
             }
         }, true);
@@ -1563,18 +1853,18 @@ function installClickCapture() {
 function renderSkinBlacklistUI(container) {
     const wrap = document.createElement('div');
     wrap.style.cssText = 'border:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.015);border-radius:6px;overflow:hidden;margin-top:10px;';
-    
+
     const header = document.createElement('div');
     header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:10px 14px;cursor:pointer;user-select:none;';
-    
+
     const title = document.createElement('div');
     title.textContent = 'Skin Blacklist Editor';
     title.style.cssText = 'color:#c8aa6e;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;';
-    
+
     const expandIcon = document.createElement('div');
     expandIcon.textContent = '▼';
     expandIcon.style.cssText = 'font-size:10px;color:#a09b8c;transition:transform 0.2s;';
-    
+
     header.appendChild(title);
     header.appendChild(expandIcon);
     wrap.appendChild(header);
@@ -1615,7 +1905,7 @@ function renderSkinBlacklistUI(container) {
         e.stopPropagation();
         isBlacklistLockedMode = !isBlacklistLockedMode;
         Utils.Store.set('whaleHelper', 'skinBlacklistLockedMode', isBlacklistLockedMode);
-        
+
         if (isBlacklistLockedMode && isHideUnownedEnabled) {
             isHideUnownedEnabled = false;
             Utils.Store.set('whaleHelper', 'hideUnownedEnabled', false);
@@ -1641,17 +1931,28 @@ function renderSkinBlacklistUI(container) {
     searchInput.type = 'text';
     searchInput.placeholder = 'Search champion name...';
     Object.assign(searchInput.style, {
-        background: '#111', color: '#f0e6d2', border: '1px solid #3e2e13',
-        borderRadius: '2px', padding: '6px 10px', outline: 'none', fontSize: '13px', flex: '1', minWidth: '0'
+        background: '#111',
+        color: '#f0e6d2',
+        border: '1px solid #3e2e13',
+        borderRadius: '2px',
+        padding: '6px 10px',
+        outline: 'none',
+        fontSize: '13px',
+        flex: '1',
+        minWidth: '0'
     });
     searchInput.addEventListener('click', e => e.stopPropagation());
-    
+
     const clearAllBtn = document.createElement('button');
     clearAllBtn.textContent = 'Clear All';
     clearAllBtn.title = 'Remove all blacklisted skins';
     clearAllBtn.style.cssText = 'padding:6px 10px;background:rgba(232,64,87,0.1);color:#e84057;border:1px solid rgba(232,64,87,0.3);border-radius:2px;cursor:pointer;font-size:12px;transition:all 0.15s;flex-shrink:0;';
-    clearAllBtn.onmouseover = () => { clearAllBtn.style.background = 'rgba(232,64,87,0.2)'; };
-    clearAllBtn.onmouseout = () => { clearAllBtn.style.background = 'rgba(232,64,87,0.1)'; };
+    clearAllBtn.onmouseover = () => {
+        clearAllBtn.style.background = 'rgba(232,64,87,0.2)';
+    };
+    clearAllBtn.onmouseout = () => {
+        clearAllBtn.style.background = 'rgba(232,64,87,0.1)';
+    };
 
     searchRow.appendChild(searchInput);
     searchRow.appendChild(clearAllBtn);
@@ -1671,7 +1972,7 @@ function renderSkinBlacklistUI(container) {
     function buildChampMapFromCache() {
         const champMap = new Map(); // champId -> { skins: [] }
         const allChromaIds = new Set();
-        
+
         // First pass: collect all chroma IDs
         for (const skin of skinsCache.values()) {
             if (skin.chromas && Array.isArray(skin.chromas)) {
@@ -1683,11 +1984,13 @@ function renderSkinBlacklistUI(container) {
         for (const [id, skin] of skinsCache.entries()) {
             if (allChromaIds.has(id)) continue; // skip chromas
             if (!skin || !skin.id) continue;
-            
+
             const champId = Math.floor(id / 1000);
             if (!champId) continue;
-            
-            if (!champMap.has(champId)) champMap.set(champId, { skins: [] });
+
+            if (!champMap.has(champId)) champMap.set(champId, {
+                skins: []
+            });
             champMap.get(champId).skins.push(skin);
         }
         return champMap;
@@ -1710,9 +2013,11 @@ function renderSkinBlacklistUI(container) {
             try {
                 const champs = await Utils.LCU.get('/lol-game-data/assets/v1/champion-summary.json');
                 if (Array.isArray(champs)) {
-                    champs.forEach(c => { if (c.id > 0) champNameMap.set(c.id, c.name); });
+                    champs.forEach(c => {
+                        if (c.id > 0) champNameMap.set(c.id, c.name);
+                    });
                 }
-            } catch(e) {}
+            } catch (e) {}
         }
 
         // Sort champions by name
@@ -1735,8 +2040,12 @@ function renderSkinBlacklistUI(container) {
 
                 const row = document.createElement('div');
                 row.style.cssText = `display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:4px;cursor:pointer;transition:background 0.15s;background:${selectedChampId === champ.champId ? 'rgba(200,170,110,0.12)' : 'transparent'};`;
-                row.onmouseover = () => { if (selectedChampId !== champ.champId) row.style.background = 'rgba(255,255,255,0.04)'; };
-                row.onmouseout  = () => { if (selectedChampId !== champ.champId) row.style.background = 'transparent'; };
+                row.onmouseover = () => {
+                    if (selectedChampId !== champ.champId) row.style.background = 'rgba(255,255,255,0.04)';
+                };
+                row.onmouseout = () => {
+                    if (selectedChampId !== champ.champId) row.style.background = 'transparent';
+                };
 
                 const nameEl = document.createElement('span');
                 nameEl.textContent = champ.name;
@@ -1767,18 +2076,22 @@ function renderSkinBlacklistUI(container) {
 
             const headerRow = document.createElement('div');
             headerRow.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;';
-            
+
             const title = document.createElement('div');
             title.style.cssText = 'font-size:12px;font-weight:bold;color:#c8aa6e;';
             title.textContent = `${champ.name} — Skins`;
-            
+
             const clearChampBtn = document.createElement('button');
             clearChampBtn.textContent = 'Clear Champ';
             clearChampBtn.title = 'Remove all blocks for this champion';
             clearChampBtn.style.cssText = 'padding:2px 8px;background:rgba(232,64,87,0.1);color:#e84057;border:1px solid rgba(232,64,87,0.3);border-radius:2px;cursor:pointer;font-size:11px;transition:all 0.15s;';
-            clearChampBtn.onmouseover = () => { clearChampBtn.style.background = 'rgba(232,64,87,0.2)'; };
-            clearChampBtn.onmouseout = () => { clearChampBtn.style.background = 'rgba(232,64,87,0.1)'; };
-            
+            clearChampBtn.onmouseover = () => {
+                clearChampBtn.style.background = 'rgba(232,64,87,0.2)';
+            };
+            clearChampBtn.onmouseout = () => {
+                clearChampBtn.style.background = 'rgba(232,64,87,0.1)';
+            };
+
             headerRow.appendChild(title);
             headerRow.appendChild(clearChampBtn);
             skinPanel.appendChild(headerRow);
@@ -1822,15 +2135,15 @@ function renderSkinBlacklistUI(container) {
                 if (chromas.length > 0) {
                     const chromaHeader = document.createElement('div');
                     chromaHeader.style.cssText = 'padding:3px 8px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(255,255,255,0.04);cursor:pointer;background:rgba(0,0,0,0.2);';
-                    
+
                     const chromaLabel = document.createElement('div');
                     chromaLabel.textContent = `Chromas (${chromas.length})`;
                     chromaLabel.style.cssText = 'font-size:10px;color:#4a6070;text-transform:uppercase;letter-spacing:0.05em;';
-                    
+
                     const expandIcon = document.createElement('div');
                     expandIcon.textContent = '▼';
                     expandIcon.style.cssText = 'font-size:8px;color:#4a6070;transition:transform 0.2s;';
-                    
+
                     chromaHeader.appendChild(chromaLabel);
                     chromaHeader.appendChild(expandIcon);
                     skinRow.appendChild(chromaHeader);
@@ -1846,7 +2159,7 @@ function renderSkinBlacklistUI(container) {
                         e.stopPropagation();
                         if (expandedSkins.has(skin.id)) expandedSkins.delete(skin.id);
                         else expandedSkins.add(skin.id);
-                        
+
                         const exp = expandedSkins.has(skin.id);
                         chromaSection.style.display = exp ? 'flex' : 'none';
                         expandIcon.style.transform = exp ? 'rotate(180deg)' : 'rotate(0deg)';
@@ -1928,7 +2241,7 @@ function renderSkinBlacklistUI(container) {
     }
 
     loadAndRender().catch(e => Utils.Debug.error('[WhaleHelper] Skin blacklist UI error:', e));
-    
+
     container.appendChild(wrap);
 }
 
@@ -1990,56 +2303,54 @@ export function installEmberHook() {
     Utils.Hooks.Ember.registerRule({
         name: 'skin-select-hook',
         matcher: 'skin-select',
-        wraps: [
-            {
-                name: 'handleSkinCarouselSkins',
-                replacement: function(original, args) {
-                    const runHideUnowned = isHideUnownedEnabled;
-                    const runBlacklist = isBlacklistEnabled && skinBlacklist.size > 0;
+        wraps: [{
+            name: 'handleSkinCarouselSkins',
+            replacement: function(original, args) {
+                const runHideUnowned = isHideUnownedEnabled;
+                const runBlacklist = isBlacklistEnabled && skinBlacklist.size > 0;
 
-                    if ((runHideUnowned || runBlacklist) && args && args[0] && Array.isArray(args[0])) {
-                        args[0] = args[0].filter(skin => {
-                            // 1. Hide unowned check for parent skin
-                            if (runHideUnowned && !skin.unlocked && !skin.isBase && (!skin.id || skin.id % 1000 !== 0)) {
+                if ((runHideUnowned || runBlacklist) && args && args[0] && Array.isArray(args[0])) {
+                    args[0] = args[0].filter(skin => {
+                        // 1. Hide unowned check for parent skin
+                        if (runHideUnowned && !skin.unlocked && !skin.isBase && (!skin.id || skin.id % 1000 !== 0)) {
+                            return false;
+                        }
+
+                        // 2. Blacklist check for parent skin
+                        if (runBlacklist && skin.id && skinBlacklist.has(Number(skin.id))) {
+                            if (isBlacklistLockedMode) {
+                                skin.unlocked = false;
+                                if (skin.ownership) skin.ownership.owned = false;
+                            } else {
                                 return false;
                             }
-                            
-                            // 2. Blacklist check for parent skin
-                            if (runBlacklist && skin.id && skinBlacklist.has(Number(skin.id))) {
-                                if (isBlacklistLockedMode) {
-                                    skin.unlocked = false;
-                                    if (skin.ownership) skin.ownership.owned = false;
-                                } else {
-                                    return false;
-                                }
-                            }
-                            
-                            // 3. Mutate childSkins in-place (chromas)
-                            if (skin.childSkins && Array.isArray(skin.childSkins)) {
-                                for (let i = skin.childSkins.length - 1; i >= 0; i--) {
-                                    const chroma = skin.childSkins[i];
-                                    const hideUnowned = runHideUnowned && !chroma.unlocked;
-                                    const isBlacklisted = runBlacklist && chroma.id && skinBlacklist.has(Number(chroma.id));
-                                    
-                                    if (hideUnowned) {
+                        }
+
+                        // 3. Mutate childSkins in-place (chromas)
+                        if (skin.childSkins && Array.isArray(skin.childSkins)) {
+                            for (let i = skin.childSkins.length - 1; i >= 0; i--) {
+                                const chroma = skin.childSkins[i];
+                                const hideUnowned = runHideUnowned && !chroma.unlocked;
+                                const isBlacklisted = runBlacklist && chroma.id && skinBlacklist.has(Number(chroma.id));
+
+                                if (hideUnowned) {
+                                    skin.childSkins.splice(i, 1);
+                                } else if (isBlacklisted) {
+                                    if (isBlacklistLockedMode) {
+                                        chroma.unlocked = false;
+                                        if (chroma.ownership) chroma.ownership.owned = false;
+                                    } else {
                                         skin.childSkins.splice(i, 1);
-                                    } else if (isBlacklisted) {
-                                        if (isBlacklistLockedMode) {
-                                            chroma.unlocked = false;
-                                            if (chroma.ownership) chroma.ownership.owned = false;
-                                        } else {
-                                            skin.childSkins.splice(i, 1);
-                                        }
                                     }
                                 }
                             }
-                            return true;
-                        });
-                    }
-                    return original.apply(this, args);
+                        }
+                        return true;
+                    });
                 }
+                return original.apply(this, args);
             }
-        ]
+        }]
     });
 
     // Skin randomizer dice button
@@ -2114,18 +2425,17 @@ export function init(context) {
         class: "whale-helper-settings"
     });
 
-    isLootEnabled     = Utils.Store.get('whaleHelper', 'lootHelperEnabled') ?? true;
+    isLootEnabled = Utils.Store.get('whaleHelper', 'lootHelperEnabled') ?? true;
     isSkinTierEnabled = Utils.Store.get('whaleHelper', 'skinTierEnabled') ?? true;
     isDropOddsEnabled = Utils.Store.get('whaleHelper', 'dropOddsEnabled') ?? true;
     isHideUnownedEnabled = Utils.Store.get('whaleHelper', 'hideUnownedEnabled') ?? false;
-	isSkinRandomizerEnabled = Utils.Store.get('whaleHelper', 'skinRandomizerEnabled') ?? false;
+    isSkinRandomizerEnabled = Utils.Store.get('whaleHelper', 'skinRandomizerEnabled') ?? false;
     isBlacklistEnabled = Utils.Store.get('whaleHelper', 'skinBlacklistEnabled') ?? false;
     isBlacklistLockedMode = Utils.Store.get('whaleHelper', 'skinBlacklistLockedMode') ?? false;
 
     if (window.SnoozeManager?.registerModule) {
         // Assign the array to our previously empty smSettingsArray
-        smSettingsArray = [
-            {
+        smSettingsArray = [{
                 type: 'toggle',
                 id: 'sm:whaleHelper',
                 label: 'Enable Rerollable Pool Button (Loot Page)',
@@ -2133,8 +2443,10 @@ export function init(context) {
                 onChange: (val) => {
                     isLootEnabled = val;
                     Utils.Store.set('whaleHelper', 'lootHelperEnabled', val);
-                    if (!val) { removeButton(); closePanel(); } 
-                    else {
+                    if (!val) {
+                        removeButton();
+                        closePanel();
+                    } else {
                         const container = document.querySelector('.loot-action-tabs-container');
                         if (container) injectButton(container);
                     }
@@ -2152,7 +2464,8 @@ export function init(context) {
                         document.querySelectorAll(`[${BADGE_ATTR}]`).forEach(el => el.remove());
                         unmountSessionObserver();
                     } else {
-                        mountSessionObserver(); refreshAllBadges();
+                        mountSessionObserver();
+                        refreshAllBadges();
                     }
                 }
             },
@@ -2191,7 +2504,7 @@ export function init(context) {
                     Utils.Store.set('whaleHelper', 'skinRandomizerEnabled', val);
                 }
             },
-			{
+            {
                 type: 'toggle',
                 id: 'sm:skinBlacklistEnabled',
                 label: 'Enable Skin Blacklist (Champ Select)',
@@ -2213,30 +2526,41 @@ export function init(context) {
             description: 'Shows you which rerollable skins you don\'t own yet, and adds a button to the loot page for easy access. It also adds skin tier badges & Skin Randomizer button in champion select.',
             settings: smSettingsArray
         });
-    }else {
+    } else {
         Utils.DOM.observer.observe("lol-uikit-scrollable.whale-helper-settings", (plugin) => {
             plugin.innerHTML = '';
             plugin.appendChild(Utils.Settings.createToggleRow("Enable Whale Helper (Loot Page)", isLootEnabled, (val) => {
-                isLootEnabled = val; Utils.Store.set('whaleHelper', 'lootHelperEnabled', val);
-                if (!val) { removeButton(); closePanel(); } else {
-                    const container = document.querySelector('.loot-action-tabs-container'); if (container) injectButton(container);
+                isLootEnabled = val;
+                Utils.Store.set('whaleHelper', 'lootHelperEnabled', val);
+                if (!val) {
+                    removeButton();
+                    closePanel();
+                } else {
+                    const container = document.querySelector('.loot-action-tabs-container');
+                    if (container) injectButton(container);
                 }
             }));
 
             plugin.appendChild(Utils.Settings.createToggleRow("Enable Skin Tier Badges (Champ Select)", isSkinTierEnabled, (val) => {
-                isSkinTierEnabled = val; Utils.Store.set('whaleHelper', 'skinTierEnabled', val);
+                isSkinTierEnabled = val;
+                Utils.Store.set('whaleHelper', 'skinTierEnabled', val);
                 if (!val) {
                     document.querySelectorAll(`[${BADGE_ATTR}]`).forEach(el => el.remove());
                     unmountSessionObserver();
-                } else { mountSessionObserver(); refreshAllBadges(); }
+                } else {
+                    mountSessionObserver();
+                    refreshAllBadges();
+                }
             }));
 
             plugin.appendChild(Utils.Settings.createToggleRow("Enable Loot Drop Odds Previewer (Loot Page)", isDropOddsEnabled, (val) => {
-                isDropOddsEnabled = val; Utils.Store.set('whaleHelper', 'dropOddsEnabled', val);
+                isDropOddsEnabled = val;
+                Utils.Store.set('whaleHelper', 'dropOddsEnabled', val);
             }));
 
             plugin.appendChild(Utils.Settings.createToggleRow("Hide Unowned Skins & Chromas (Champ Select)", isHideUnownedEnabled, (val) => {
-                isHideUnownedEnabled = val; Utils.Store.set('whaleHelper', 'hideUnownedEnabled', val);
+                isHideUnownedEnabled = val;
+                Utils.Store.set('whaleHelper', 'hideUnownedEnabled', val);
                 if (val && isBlacklistLockedMode) {
                     isBlacklistLockedMode = false;
                     Utils.Store.set('whaleHelper', 'skinBlacklistLockedMode', false);
@@ -2245,11 +2569,13 @@ export function init(context) {
             }));
 
             plugin.appendChild(Utils.Settings.createToggleRow("Show Skin Randomizer (Champ Select)", isSkinRandomizerEnabled, (val) => {
-                isSkinRandomizerEnabled = val; Utils.Store.set('whaleHelper', 'skinRandomizerEnabled', val);
+                isSkinRandomizerEnabled = val;
+                Utils.Store.set('whaleHelper', 'skinRandomizerEnabled', val);
             }));
 
             plugin.appendChild(Utils.Settings.createToggleRow("Enable Skin Blacklist (Champ Select)", isBlacklistEnabled, (val) => {
-                isBlacklistEnabled = val; Utils.Store.set('whaleHelper', 'skinBlacklistEnabled', val);
+                isBlacklistEnabled = val;
+                Utils.Store.set('whaleHelper', 'skinBlacklistEnabled', val);
             }));
 
             const extraRow = document.createElement("div");

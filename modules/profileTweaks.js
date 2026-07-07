@@ -124,7 +124,7 @@ async function removeBorder(statusMessageElement) {
         await Utils.LCU.put('/lol-regalia/v2/current-summoner/regalia', {
             preferredCrestType: 'prestige',
             preferredBannerType: 'blank',
-			selectedPrestigeCrest: 22,
+            selectedPrestigeCrest: 22,
         });
         flashMessage(statusMessageElement, 'Border removed!', '#4caf82');
     } catch (err) {
@@ -321,7 +321,7 @@ async function renderSettings(container) {
     const summary = await fetchProfileSummary();
     if (summary) {
         currentProfilePreferences = getCurrentPreferences(summary);
-        
+
         // Sync the live profile tokens to the input state
         if (currentProfilePreferences.challengeIds) {
             tokenIds = normalizeTokenIds(currentProfilePreferences.challengeIds);
@@ -455,9 +455,12 @@ async function renderSettings(container) {
                     if (levelKey && p[levelKey]) {
                         src = p[levelKey];
                     } else {
-                        const fallbackOrder = ['CHALLENGER','MASTER','DIAMOND','GOLD','PLATINUM','SILVER','BRONZE'];
+                        const fallbackOrder = ['CHALLENGER', 'MASTER', 'DIAMOND', 'GOLD', 'PLATINUM', 'SILVER', 'BRONZE'];
                         for (const k of fallbackOrder) {
-                            if (p[k]) { src = p[k]; break; }
+                            if (p[k]) {
+                                src = p[k];
+                                break;
+                            }
                         }
                         if (!src) src = Object.values(p)[0] || null;
                     }
@@ -566,19 +569,18 @@ export function init(context) {
             id: 'profileTweaks',
             name: 'Profile Tweaks',
             description: 'Remove profile banner/border, manage token preferences, and unlock profile background.',
-            settings: [
-				{
-					type: 'toggle',
-					id: 'sm:unlockProfileBackground',
-					label: 'Unlock Profile Background',
-					value: unlockBackgroundEnabled,
-					onChange: (val) => toggleUnlockProfileBackground(val)
-				},
-				{
-					type: 'custom',
-					render: (row) => renderSettings(row)
-				}
-			]
+            settings: [{
+                    type: 'toggle',
+                    id: 'sm:unlockProfileBackground',
+                    label: 'Unlock Profile Background',
+                    value: unlockBackgroundEnabled,
+                    onChange: (val) => toggleUnlockProfileBackground(val)
+                },
+                {
+                    type: 'custom',
+                    render: (row) => renderSettings(row)
+                }
+            ]
         });
     } else {
         Utils.DOM.observer.observe('lol-uikit-scrollable.profile-tweaks-settings', (plugin) => {
@@ -625,7 +627,7 @@ async function installChampionInventoryHook() {
             if (!Utils.Store.get(MODULE_KEY, SETTINGS_KEY_UNLOCK_BACKGROUND)) return responseText;
             debugLog('champion inventory hook matched', url);
             try {
-                        const responseBody = responseText;
+                const responseBody = responseText;
                 let inventoryItems = JSON.parse(responseBody);
                 const fakePurchaseDateMs = getRandomPastPurchaseDateMs();
                 if (Array.isArray(inventoryItems)) {
@@ -660,7 +662,12 @@ async function installChampionInventoryHook() {
                         value: JSON.stringify(inventoryItems)
                     });
                     if (xhr.responseType === '' || xhr.responseType === 'text') {
-                        try { Object.defineProperty(xhr, 'response', { writable: true, value: JSON.stringify(inventoryItems) }); } catch (err) {}
+                        try {
+                            Object.defineProperty(xhr, 'response', {
+                                writable: true,
+                                value: JSON.stringify(inventoryItems)
+                            });
+                        } catch (err) {}
                     }
                 }
                 return JSON.stringify(inventoryItems);

@@ -31,21 +31,32 @@ function renderExtraSettings(container) {
     const selectRow = document.createElement('div');
     selectRow.style.display = 'flex';
     selectRow.style.width = '100%';
-    
-    const select = document.createElement('select');
-    Object.assign(select.style, { background: '#111', color: '#f0e6d2', border: '1px solid #3e2e13', padding: '6px', borderRadius: '2px', flex: '1', outline: 'none' });
-    
-    const optAllies = document.createElement('option');
-    optAllies.value = 'allies'; optAllies.textContent = 'Honor Allies';
-    const optEnemies = document.createElement('option');
-    optEnemies.value = 'enemies'; optEnemies.textContent = 'Honor Enemies';
-    const optRandom = document.createElement('option');
-    optRandom.value = 'random'; optRandom.textContent = 'Honor Random (Any)';
 
-    select.appendChild(optAllies); 
+    const select = document.createElement('select');
+    Object.assign(select.style, {
+        background: '#111',
+        color: '#f0e6d2',
+        border: '1px solid #3e2e13',
+        padding: '6px',
+        borderRadius: '2px',
+        flex: '1',
+        outline: 'none'
+    });
+
+    const optAllies = document.createElement('option');
+    optAllies.value = 'allies';
+    optAllies.textContent = 'Honor Allies';
+    const optEnemies = document.createElement('option');
+    optEnemies.value = 'enemies';
+    optEnemies.textContent = 'Honor Enemies';
+    const optRandom = document.createElement('option');
+    optRandom.value = 'random';
+    optRandom.textContent = 'Honor Random (Any)';
+
+    select.appendChild(optAllies);
     select.appendChild(optEnemies);
     select.appendChild(optRandom);
-    
+
     select.value = Utils.Store.get('autoHonor', 'mode') || 'allies';
     select.addEventListener('change', (e) => Utils.Store.set('autoHonor', 'mode', e.target.value));
     selectRow.appendChild(select);
@@ -76,8 +87,7 @@ export function init(context) {
             id: 'autoHonor',
             name: 'Auto Honor',
             description: 'Automatically honors a teammate, enemy, or random player when the game finishes.',
-            settings: [
-                {
+            settings: [{
                     type: 'toggle',
                     id: 'sm:autoHonor',
                     label: 'Enable Auto Honor',
@@ -185,8 +195,14 @@ async function autoHonorTeammate() {
             opponents: ballot.eligibleOpponents?.length || 0,
             votes: ballot.votePool?.votes || 0
         });
-        Utils.Debug.log('[AutoHonor] Eligible allies:', ballot.eligibleAllies?.map(p => ({ name: p.summonerName || p.gameName || p.puuid, puuid: p.puuid })));
-        Utils.Debug.log('[AutoHonor] Eligible opponents:', ballot.eligibleOpponents?.map(p => ({ name: p.summonerName || p.gameName || p.puuid, puuid: p.puuid })));
+        Utils.Debug.log('[AutoHonor] Eligible allies:', ballot.eligibleAllies?.map(p => ({
+            name: p.summonerName || p.gameName || p.puuid,
+            puuid: p.puuid
+        })));
+        Utils.Debug.log('[AutoHonor] Eligible opponents:', ballot.eligibleOpponents?.map(p => ({
+            name: p.summonerName || p.gameName || p.puuid,
+            puuid: p.puuid
+        })));
 
         let didVote = false;
 
@@ -249,7 +265,7 @@ async function autoHonorTeammate() {
             Utils.Debug.log('[AutoHonor] No votes staged — skipped finalize and ack.');
         }
 
-    } catch(err) {
+    } catch (err) {
         Utils.Debug.error('[AutoHonor] Critical error encountered during runtime:', err);
     }
 }

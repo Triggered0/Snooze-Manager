@@ -45,7 +45,7 @@ function findModalWrapperDeep(el) {
                 return current;
             }
         }
-        
+
         if (current.parentNode) {
             current = current.parentNode;
         } else if (current instanceof ShadowRoot) {
@@ -65,7 +65,7 @@ function suppress() {
         '.leaver-buster-lockout-error-dialog, .low-priority-dialog, ' +
         '.low-priority-queue-warning, .queue-restriction-notification'
     );
-    
+
     targets.forEach(el => {
         const modal = findModalWrapperDeep(el);
         if (modal) {
@@ -96,13 +96,13 @@ function suppress() {
 function isLockoutModal(options) {
     if (bypassModalHook) {
         Utils.Debug.log('[LowPrioWarningSuppress] Bypassing lockout check (testing trigger active)');
-        return false; 
+        return false;
     }
     if (!options || !options.data) return false;
-    
+
     const contents = options.data.contents;
     if (!contents) return false;
-    
+
     // String component name
     if (typeof contents === 'string') {
         const lower = contents.toLowerCase();
@@ -115,21 +115,21 @@ function isLockoutModal(options) {
             lower === 'low-priority-dialog'
         );
     }
-    
+
     // DOM Element (E.g. pre-rendered Component Factory node)
     if (contents.nodeType === Node.ELEMENT_NODE || contents instanceof HTMLElement) {
         // Match the structural class names assigned during component creation
         const hasPenaltyClass = contents.classList?.contains('PartyQueueErrorDialogComponent') ||
-                               contents.classList?.contains('LowPriorityQueueModalComponent') ||
-                               contents.matches?.('.parties-queue-error-dialog, .queue-dodge-error-dialog, .ready-check-failer-error-dialog, .disruptive-gameplay-lockout-error-dialog, .leaver-buster-lockout-error-dialog, .low-priority-dialog, .leaver-buster-dialog') ||
-                               contents.querySelector?.('.parties-queue-error-dialog, .queue-dodge-error-dialog, .ready-check-failer-error-dialog, .disruptive-gameplay-lockout-error-dialog, .leaver-buster-lockout-error-dialog, .low-priority-dialog, .leaver-buster-dialog');
-        
+            contents.classList?.contains('LowPriorityQueueModalComponent') ||
+            contents.matches?.('.parties-queue-error-dialog, .queue-dodge-error-dialog, .ready-check-failer-error-dialog, .disruptive-gameplay-lockout-error-dialog, .leaver-buster-lockout-error-dialog, .low-priority-dialog, .leaver-buster-dialog') ||
+            contents.querySelector?.('.parties-queue-error-dialog, .queue-dodge-error-dialog, .ready-check-failer-error-dialog, .disruptive-gameplay-lockout-error-dialog, .leaver-buster-lockout-error-dialog, .low-priority-dialog, .leaver-buster-dialog');
+
         if (hasPenaltyClass) {
             Utils.Debug.log('[LowPrioWarningSuppress] [LockoutCheck] Lockout class matched inside contents');
             return true;
         }
     }
-    
+
     return false;
 }
 
@@ -232,7 +232,7 @@ export function init(context) {
     Utils.Debug.log('[LowPrioWarningSuppress] Initializing module...');
     migrateSettings();
     enabled = Utils.Store.get(MODULE_KEY, 'enabled') ?? true;
-    
+
     Utils.Settings.inject(context, {
         name: 'low-prio-warning-suppress-settings',
         titleKey: 'snooze_low-prio-warning-suppress',
@@ -254,7 +254,7 @@ export function init(context) {
                 const originalAdd = modalManager.add;
                 modalManager.add = function(options) {
                     Utils.Debug.log('[LowPrioWarningSuppress] [ModalManager] add() intercepted options:', options);
-                    
+
                     if (enabled && isLockoutModal(options)) {
                         Utils.Debug.log('[LowPrioWarningSuppress] [ModalManager] BLOCKED native lockout dialogue completely.');
                         return {
@@ -264,7 +264,7 @@ export function init(context) {
                             domNode: document.createElement('div')
                         };
                     }
-                    
+
                     Utils.Debug.log('[LowPrioWarningSuppress] [ModalManager] PERMITTED modal:', options?.data?.contents);
                     return originalAdd.apply(this, arguments);
                 };
@@ -287,23 +287,23 @@ export function init(context) {
                 callback(Ember, original, ...args) {
                     const [errorType, errorId] = args;
                     Utils.Debug.log(`[LowPrioWarningSuppress] [Ember] showQueueErrorModal() intercepted. errorType: ${errorType}, enabled: ${enabled}`);
-                    
+
                     if (enabled && (
-                        errorType.includes('LEAVER_BUSTER') ||
-                        errorType.includes('LOW_PRIORITY') ||
-                        errorType.includes('DISRUPTIVE_GAMEPLAY') ||
-                        errorType === 'QUEUE_DODGER' ||
-                        errorType === 'READY_CHECK_FAILER'
-                    )) {
+                            errorType.includes('LEAVER_BUSTER') ||
+                            errorType.includes('LOW_PRIORITY') ||
+                            errorType.includes('DISRUPTIVE_GAMEPLAY') ||
+                            errorType === 'QUEUE_DODGER' ||
+                            errorType === 'READY_CHECK_FAILER'
+                        )) {
                         Utils.Debug.log('[LowPrioWarningSuppress] [Ember] BLOCKED showQueueErrorModal execution completely for:', errorType);
-                        
+
                         const notified = this.get('_notifiedSearchErrorIds') || Ember.Object.create({});
                         notified[errorId] = true;
                         this.set('_notifiedSearchErrorIds', notified);
                         this.set('_isTransitioningState', false);
                         return;
                     }
-                    
+
                     Utils.Debug.log('[LowPrioWarningSuppress] [Ember] Pass-through to original showQueueErrorModal()');
                     return original(...args);
                 }
@@ -329,30 +329,30 @@ export function init(context) {
                     showError: Ember.computed('errorType', 'dialogSubComponent', function() {
                         const errorType = this.get('errorType');
                         Utils.Debug.log(`[LowPrioWarningSuppress] [Ember] ${matcher} showError evaluated. errorType:`, errorType);
-                        
+
                         if (!enabled) {
                             return !Ember.isEmpty(this.get('dialogSubComponent'));
                         }
-                        
+
                         if (errorType && (
-                            errorType.includes('LEAVER_BUSTER') ||
-                            errorType.includes('LOW_PRIORITY') ||
-                            errorType.includes('DISRUPTIVE_GAMEPLAY') ||
-                            errorType === 'QUEUE_DODGER' ||
-                            errorType === 'READY_CHECK_FAILER'
-                        )) {
+                                errorType.includes('LEAVER_BUSTER') ||
+                                errorType.includes('LOW_PRIORITY') ||
+                                errorType.includes('DISRUPTIVE_GAMEPLAY') ||
+                                errorType === 'QUEUE_DODGER' ||
+                                errorType === 'READY_CHECK_FAILER'
+                            )) {
                             Utils.Debug.log(`[LowPrioWarningSuppress] [Ember] ${matcher} showError overridden to false`);
                             return false;
                         }
                         return !Ember.isEmpty(this.get('dialogSubComponent'));
                     }),
-                    
+
                     didInsertElement() {
                         this._super(...arguments);
                         Utils.Debug.log(`[LowPrioWarningSuppress] [Ember] ${matcher} didInsertElement fired`);
-                        
+
                         if (!enabled) return;
-                        
+
                         const el = this.$();
                         if (el && el.length) {
                             el.hide();
@@ -376,15 +376,13 @@ export function init(context) {
             id: MODULE_KEY,
             name: 'Low Priority Warning Suppress',
             description: 'Suppresses low priority queue, leaverbuster, queue dodge, and ready-check-failer warning dialogs.',
-            settings: [
-                {
-                    type: 'toggle',
-                    id: 'sm:lowPrioWarningSuppress',
-                    label: 'Enable Warning Suppression',
-                    value: enabled,
-                    onChange: (v) => setEnabled(v)
-                }
-            ]
+            settings: [{
+                type: 'toggle',
+                id: 'sm:lowPrioWarningSuppress',
+                label: 'Enable Warning Suppression',
+                value: enabled,
+                onChange: (v) => setEnabled(v)
+            }]
         });
     } else {
         Utils.DOM.observer.observe('lol-uikit-scrollable.low-prio-warning-suppress-settings', (plugin) => {

@@ -38,7 +38,7 @@ function fetchCurrentSummoner() {
             currentSummonerId = me.summonerId;
             currentPuuid = me.puuid;
         }
-    }).catch(()=>{});
+    }).catch(() => {});
 }
 
 function getLockBeforeEndMs() {
@@ -119,17 +119,34 @@ function styleButton(button, compact = false) {
 
 function renderPriorityPicker(container, labelText, storeKey, role, champions) {
     const wrap = document.createElement('div');
-    Object.assign(wrap.style, { display: 'flex', flexDirection: 'column', gap: '6px' });
+    Object.assign(wrap.style, {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '6px'
+    });
 
     const label = document.createElement('div');
     label.textContent = labelText;
-    Object.assign(label.style, { color: '#f0e6d2', fontSize: '12px', fontWeight: 'bold' });
+    Object.assign(label.style, {
+        color: '#f0e6d2',
+        fontSize: '12px',
+        fontWeight: 'bold'
+    });
 
     const chips = document.createElement('div');
-    Object.assign(chips.style, { display: 'flex', gap: '6px', flexWrap: 'wrap', minHeight: '28px' });
+    Object.assign(chips.style, {
+        display: 'flex',
+        gap: '6px',
+        flexWrap: 'wrap',
+        minHeight: '28px'
+    });
 
     const controlRow = document.createElement('div');
-    Object.assign(controlRow.style, { display: 'flex', gap: '6px', width: '100%' });
+    Object.assign(controlRow.style, {
+        display: 'flex',
+        gap: '6px',
+        width: '100%'
+    });
 
     const select = document.createElement('select');
     Object.assign(select.style, {
@@ -179,11 +196,18 @@ function renderPriorityPicker(container, labelText, storeKey, role, champions) {
 
             const rank = document.createElement('strong');
             rank.textContent = `${index + 1}`;
-            Object.assign(rank.style, { color: '#0ac8b9', fontSize: '11px' });
+            Object.assign(rank.style, {
+                color: '#0ac8b9',
+                fontSize: '11px'
+            });
 
             const name = document.createElement('span');
             name.textContent = getChampionName(champions, id);
-            Object.assign(name.style, { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' });
+            Object.assign(name.style, {
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+            });
 
             const up = document.createElement('button');
             up.type = 'button';
@@ -272,11 +296,20 @@ function renderExtraSettings(container) {
 
     // Role Select
     const roleRow = document.createElement('div');
-    Object.assign(roleRow.style, { display: 'flex', alignItems: 'center', gap: '10px', marginTop: '5px' });
+    Object.assign(roleRow.style, {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        marginTop: '5px'
+    });
 
     const roleLabel = document.createElement('span');
     roleLabel.textContent = 'Configure Role:';
-    Object.assign(roleLabel.style, { color: '#a09b8c', fontSize: '12px', whiteSpace: 'nowrap' });
+    Object.assign(roleLabel.style, {
+        color: '#a09b8c',
+        fontSize: '12px',
+        whiteSpace: 'nowrap'
+    });
 
     const roleSelect = document.createElement('select');
     Object.assign(roleSelect.style, {
@@ -289,13 +322,30 @@ function renderExtraSettings(container) {
         fontSize: '13px'
     });
 
-    const ROLES = [
-        { id: 'default', label: 'Default / Any' },
-        { id: 'top', label: 'Top' },
-        { id: 'jungle', label: 'Jungle' },
-        { id: 'middle', label: 'Middle' },
-        { id: 'bottom', label: 'Bottom' },
-        { id: 'utility', label: 'Support' }
+    const ROLES = [{
+            id: 'default',
+            label: 'Default / Any'
+        },
+        {
+            id: 'top',
+            label: 'Top'
+        },
+        {
+            id: 'jungle',
+            label: 'Jungle'
+        },
+        {
+            id: 'middle',
+            label: 'Middle'
+        },
+        {
+            id: 'bottom',
+            label: 'Bottom'
+        },
+        {
+            id: 'utility',
+            label: 'Support'
+        }
     ];
 
     ROLES.forEach(r => {
@@ -310,7 +360,11 @@ function renderExtraSettings(container) {
     container.appendChild(roleRow);
 
     const pickerHost = document.createElement('div');
-    Object.assign(pickerHost.style, { display: 'flex', flexDirection: 'column', gap: '10px' });
+    Object.assign(pickerHost.style, {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '10px'
+    });
     container.appendChild(pickerHost);
 
     let cachedChamps = [];
@@ -340,21 +394,33 @@ function renderExtraSettings(container) {
     if (Utils.LCU) {
         Utils.LCU.get('/lol-game-data/assets/v1/champion-summary.json').then(champs => {
             if (champs && champs.length) {
-                cachedChamps = champs.filter(c => c.id > 0).sort((a,b) => a.name.localeCompare(b.name));
+                cachedChamps = champs.filter(c => c.id > 0).sort((a, b) => a.name.localeCompare(b.name));
                 updatePickers();
             }
-        }).catch(()=>{});
+        }).catch(() => {});
     }
 
     const pickToggleRow = document.createElement('div');
-    Object.assign(pickToggleRow.style, { display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', marginTop: '10px' });
+    Object.assign(pickToggleRow.style, {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        cursor: 'pointer',
+        marginTop: '10px'
+    });
     pickToggleRow.appendChild(Utils.Settings.createToggleRow('Auto Lock-in Pick', Utils.Store.get('autoLockChampion', 'instantPick') !== false, (next) => {
         Utils.Store.set('autoLockChampion', 'instantPick', next);
     }));
     container.appendChild(pickToggleRow);
 
     const banToggleRow = document.createElement('div');
-    Object.assign(banToggleRow.style, { display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', marginTop: '10px' });
+    Object.assign(banToggleRow.style, {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        cursor: 'pointer',
+        marginTop: '10px'
+    });
     banToggleRow.appendChild(Utils.Settings.createToggleRow('Auto Lock-in Ban', Utils.Store.get('autoLockChampion', 'instantBan') !== false, (next) => {
         Utils.Store.set('autoLockChampion', 'instantBan', next);
     }));
@@ -394,7 +460,10 @@ function completePendingActions() {
         if (now - lastPatchTime < 1500) continue;
         lastAutoLockKeys.set(action.id + '_time', now);
         Utils.Debug.log(`[AutoSelect] Ember timer triggered lock for action ${action.id}`);
-        Utils.LCU.patch(`/lol-champ-select/v1/session/actions/${action.id}`, { championId: champId, completed: true }).catch(() => {});
+        Utils.LCU.patch(`/lol-champ-select/v1/session/actions/${action.id}`, {
+            championId: champId,
+            completed: true
+        }).catch(() => {});
     }
 }
 
@@ -470,8 +539,7 @@ export function init(context) {
             id: 'autoLockChampion',
             name: 'Auto Select Champion',
             description: 'Automatically hovers, locks, or bans champions by priority & role in champion select, with separate top-3 priority lists per role.',
-            settings: [
-                {
+            settings: [{
                     type: 'toggle',
                     id: 'sm:autoLockChampion',
                     label: 'Enable Auto Select Champion',
@@ -519,8 +587,8 @@ async function processChampSelectSession(s) {
 
     let myPosition = 'default';
     if (s.myTeam) {
-        const me = s.myTeam.find(p => 
-            (currentPuuid && p.puuid === currentPuuid) || 
+        const me = s.myTeam.find(p =>
+            (currentPuuid && p.puuid === currentPuuid) ||
             (currentSummonerId && p.summonerId === currentSummonerId) ||
             (p.cellId === s.localPlayerCellId)
         );
@@ -528,7 +596,7 @@ async function processChampSelectSession(s) {
             myPosition = me.assignedPosition;
         }
     }
-    
+
     if (!myPosition) myPosition = 'default';
 
     const allActions = s.actions ? s.actions.flat(2) : [];
@@ -537,17 +605,17 @@ async function processChampSelectSession(s) {
     const myActions = allActions.filter(a => {
         if (a.actorCellId !== s.localPlayerCellId || a.completed) return false;
         if (a.type !== 'pick' && a.type !== 'ban') return false;
-        
+
         if (a.isInProgress) return true;
         if (a.type === 'pick' && getChampSelectPhase(s) === 'PLANNING') return true;
-        
+
         return false;
     });
 
     if (myActions.length === 0) {
-      lastAutoLockKeys.clear();
-      actionActiveStartTimes.clear();
-      return;
+        lastAutoLockKeys.clear();
+        actionActiveStartTimes.clear();
+        return;
     }
 
     const instantPick = Utils.Store.get('autoLockChampion', 'instantPick') !== false;
@@ -557,82 +625,82 @@ async function processChampSelectSession(s) {
     const now = Date.now();
 
     for (const action of myActions) {
-      const phase = getChampSelectPhase(s);
-      const isReadyForHover = 
-          (action.type === 'pick' && (action.isInProgress || phase === 'PLANNING')) ||
-          (action.type === 'ban' && action.isInProgress && phase === 'BAN_PICK');
+        const phase = getChampSelectPhase(s);
+        const isReadyForHover =
+            (action.type === 'pick' && (action.isInProgress || phase === 'PLANNING')) ||
+            (action.type === 'ban' && action.isInProgress && phase === 'BAN_PICK');
 
-      if (isReadyForHover && !actionActiveStartTimes.has(action.id)) {
-        actionActiveStartTimes.set(action.id, now);
-        
-        // Schedule a re-evaluation when the hover delay expires
-        if (hoverDelayMs > 0) {
-            setTimeout(() => {
-                if (!isEnabled || panicActive) return;
-                Utils.LCU.get('/lol-champ-select/v1/session').then(s => {
-                    if (s) processChampSelectSession(s);
-                }).catch(() => {});
-            }, hoverDelayMs + 50);
+        if (isReadyForHover && !actionActiveStartTimes.has(action.id)) {
+            actionActiveStartTimes.set(action.id, now);
+
+            // Schedule a re-evaluation when the hover delay expires
+            if (hoverDelayMs > 0) {
+                setTimeout(() => {
+                    if (!isEnabled || panicActive) return;
+                    Utils.LCU.get('/lol-champ-select/v1/session').then(s => {
+                        if (s) processChampSelectSession(s);
+                    }).catch(() => {});
+                }, hoverDelayMs + 50);
+            }
         }
-      }
 
-      if (!actionActiveStartTimes.has(action.id)) {
-          continue;
-      }
-
-      const champId = chooseChampionForAction(s, action, myPosition);
-      if (!champId) continue;
-
-      const shouldComplete = shouldCompleteAction(s, action, instantPick, instantBan, lockBeforeEndMs);
-
-      // Hover delay: wait if not locking and delay hasn't elapsed
-      if (!shouldComplete && hoverDelayMs > 0) {
-        const elapsed = now - actionActiveStartTimes.get(action.id);
-        if (elapsed < hoverDelayMs) {
-          Utils.Debug.log(`[AutoSelect] Hover delay: ${elapsed}ms elapsed, waiting ${hoverDelayMs}ms before hovering action ${action.id}`);
-          continue;
+        if (!actionActiveStartTimes.has(action.id)) {
+            continue;
         }
-      }
 
-      if (action.championId === champId && action.completed === shouldComplete) {
-          continue;
-      }
+        const champId = chooseChampionForAction(s, action, myPosition);
+        if (!champId) continue;
 
-      const lastPatchTime = lastAutoLockKeys.get(action.id + '_time') || 0;
-      const cooldownMs = 1500;
+        const shouldComplete = shouldCompleteAction(s, action, instantPick, instantBan, lockBeforeEndMs);
 
-      if (now - lastPatchTime < cooldownMs) {
-          continue;
-      }
+        // Hover delay: wait if not locking and delay hasn't elapsed
+        if (!shouldComplete && hoverDelayMs > 0) {
+            const elapsed = now - actionActiveStartTimes.get(action.id);
+            if (elapsed < hoverDelayMs) {
+                Utils.Debug.log(`[AutoSelect] Hover delay: ${elapsed}ms elapsed, waiting ${hoverDelayMs}ms before hovering action ${action.id}`);
+                continue;
+            }
+        }
 
-      lastAutoLockKeys.set(action.id + '_time', now);
+        if (action.championId === champId && action.completed === shouldComplete) {
+            continue;
+        }
 
-      const payload = {
-          championId: champId,
-          completed: shouldComplete
-      };
+        const lastPatchTime = lastAutoLockKeys.get(action.id + '_time') || 0;
+        const cooldownMs = 1500;
 
-      try {
-          if (action.type === 'ban') {
-              Utils.Debug.log('[AutoSelect] ban patch', {
-                  actionId: action.id,
-                  phase: getChampSelectPhase(s),
-                  isInProgress: !!action.isInProgress,
-                  payload
-              });
-          }
+        if (now - lastPatchTime < cooldownMs) {
+            continue;
+        }
 
-          await Utils.LCU.patch(`/lol-champ-select/v1/session/actions/${action.id}`, payload);
-      } catch (err) {
-          if (action.type === 'ban') {
-              Utils.Debug.warn('[AutoSelect] ban patch failed', {
-                  actionId: action.id,
-                  phase: getChampSelectPhase(s),
-                  payload,
-                  err
-              });
-          }
-      }
+        lastAutoLockKeys.set(action.id + '_time', now);
+
+        const payload = {
+            championId: champId,
+            completed: shouldComplete
+        };
+
+        try {
+            if (action.type === 'ban') {
+                Utils.Debug.log('[AutoSelect] ban patch', {
+                    actionId: action.id,
+                    phase: getChampSelectPhase(s),
+                    isInProgress: !!action.isInProgress,
+                    payload
+                });
+            }
+
+            await Utils.LCU.patch(`/lol-champ-select/v1/session/actions/${action.id}`, payload);
+        } catch (err) {
+            if (action.type === 'ban') {
+                Utils.Debug.warn('[AutoSelect] ban patch failed', {
+                    actionId: action.id,
+                    phase: getChampSelectPhase(s),
+                    payload,
+                    err
+                });
+            }
+        }
     }
 }
 
@@ -712,7 +780,7 @@ function logBanSessionState(session, allActions, myPosition) {
 function getBannedChampionIds(session) {
     const bans = new Set();
     const sessionBans = session?.bans || {};
-    
+
     [
         ...(sessionBans.myTeamBans || []),
         ...(sessionBans.theirTeamBans || []),
@@ -742,7 +810,7 @@ function getPickedChampionIds(session) {
 
 function chooseChampionForAction(session, action, role) {
     const actionType = action.type;
-    
+
     let priorities = getPriorityList(actionType === 'ban' ? BAN_PRIORITY_KEY : PICK_PRIORITY_KEY, role);
     if (priorities.length === 0 && role !== 'default') {
         priorities = getPriorityList(actionType === 'ban' ? BAN_PRIORITY_KEY : PICK_PRIORITY_KEY, 'default');
@@ -771,7 +839,7 @@ function panic() {
     emberTimerCrossed = false;
     lastAutoLockKeys.clear();
     actionActiveStartTimes.clear();
-    
+
     Utils.Toast.info('Auto Lock Override — Next champ select will re-enable');
 }
 

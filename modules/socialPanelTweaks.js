@@ -68,7 +68,10 @@ function getCwtTarget() {
     if (tweaksEnabled && resizeEnabled) {
         const w = Number(Utils.Store.get('clientWindowTweaks', 'width'));
         const h = Number(Utils.Store.get('clientWindowTweaks', 'height'));
-        if (w > 0 && h > 0) return { w, h };
+        if (w > 0 && h > 0) return {
+            w,
+            h
+        };
     }
     return null;
 }
@@ -83,10 +86,16 @@ function getActivePhysicalHeight() {
 
 function getPhysicalDimensions() {
     const cwt = getCwtTarget();
-    if (cwt) return { w: cwt.w, h: cwt.h };
+    if (cwt) return {
+        w: cwt.w,
+        h: cwt.h
+    };
     const h = nativeClientHeight || NATIVE_HEIGHT;
     const w = Math.round((window.innerWidth * h) / NATIVE_HEIGHT);
-    return { w, h };
+    return {
+        w,
+        h
+    };
 }
 
 // color generation
@@ -117,7 +126,9 @@ async function inviteFolderGroup(folderName) {
         const targets = friends.filter(f => f.displayGroupId === group.id);
         if (!targets || targets.length === 0) return;
 
-        await Utils.LCU.post('/lol-lobby/v2/lobby/invitations', targets.map(t => ({ toSummonerId: t.summonerId })));
+        await Utils.LCU.post('/lol-lobby/v2/lobby/invitations', targets.map(t => ({
+            toSummonerId: t.summonerId
+        })));
     } catch (err) {
         Utils.Debug.error('[Snooze-SocialPanelTweaks] Failed to invite group folder:', err);
     }
@@ -156,13 +167,23 @@ function toggleCollapseMethod(method) {
         if (typeof window?.riotInvoke === 'function' && !document.fullscreenElement) {
             const cwt = getCwtTarget();
             if (cwt) {
-                const targetW = method === 'crop'
-                    ? Math.round(cwt.w * (1280 - SIDEBAR_WIDTH) / 1280) : cwt.w;
-                window.riotInvoke({ request: JSON.stringify({ name: 'Window.ResizeTo', params: [targetW, cwt.h] }) });
+                const targetW = method === 'crop' ?
+                    Math.round(cwt.w * (1280 - SIDEBAR_WIDTH) / 1280) : cwt.w;
+                window.riotInvoke({
+                    request: JSON.stringify({
+                        name: 'Window.ResizeTo',
+                        params: [targetW, cwt.h]
+                    })
+                });
             } else {
-                const targetW = method === 'crop'
-                    ? Math.round(NATIVE_HEIGHT * RATIO_COLLAPSED) : Math.round(NATIVE_HEIGHT * RATIO_16_9);
-                window.riotInvoke({ request: JSON.stringify({ name: 'Window.ResizeTo', params: [targetW, NATIVE_HEIGHT] }) });
+                const targetW = method === 'crop' ?
+                    Math.round(NATIVE_HEIGHT * RATIO_COLLAPSED) : Math.round(NATIVE_HEIGHT * RATIO_16_9);
+                window.riotInvoke({
+                    request: JSON.stringify({
+                        name: 'Window.ResizeTo',
+                        params: [targetW, NATIVE_HEIGHT]
+                    })
+                });
             }
         }
     }
@@ -186,14 +207,24 @@ function applyCollapsedState(isCollapsed, options = {}) {
         }
         const cwt = getCwtTarget();
         if (cwt) {
-            const targetW = isCollapsed && collapseMethod === 'crop'
-                ? Math.round(cwt.w * (1280 - SIDEBAR_WIDTH) / 1280) : cwt.w;
-            window.riotInvoke({ request: JSON.stringify({ name: 'Window.ResizeTo', params: [targetW, cwt.h] }) });
+            const targetW = isCollapsed && collapseMethod === 'crop' ?
+                Math.round(cwt.w * (1280 - SIDEBAR_WIDTH) / 1280) : cwt.w;
+            window.riotInvoke({
+                request: JSON.stringify({
+                    name: 'Window.ResizeTo',
+                    params: [targetW, cwt.h]
+                })
+            });
         } else {
-            const targetW = collapseMethod === 'crop'
-                ? Math.round(NATIVE_HEIGHT * (isCollapsed ? RATIO_COLLAPSED : RATIO_16_9))
-                : Math.round(NATIVE_HEIGHT * RATIO_16_9);
-            window.riotInvoke({ request: JSON.stringify({ name: 'Window.ResizeTo', params: [targetW, NATIVE_HEIGHT] }) });
+            const targetW = collapseMethod === 'crop' ?
+                Math.round(NATIVE_HEIGHT * (isCollapsed ? RATIO_COLLAPSED : RATIO_16_9)) :
+                Math.round(NATIVE_HEIGHT * RATIO_16_9);
+            window.riotInvoke({
+                request: JSON.stringify({
+                    name: 'Window.ResizeTo',
+                    params: [targetW, NATIVE_HEIGHT]
+                })
+            });
         }
     }
 }
@@ -202,7 +233,9 @@ function forceUncollapseForChampSelect() {
     if (!document.body.classList.contains('snooze-collapsed')) return;
     isChampSelectAutoUncollapseActive = true;
     shouldRestoreCollapseAfterChampSelect = true;
-    applyCollapsedState(false, { persist: false });
+    applyCollapsedState(false, {
+        persist: false
+    });
 }
 
 function restoreCollapseAfterChampSelect() {
@@ -210,7 +243,9 @@ function restoreCollapseAfterChampSelect() {
     isChampSelectAutoUncollapseActive = false;
     shouldRestoreCollapseAfterChampSelect = false;
     if (document.body.classList.contains('snooze-collapsed')) return;
-    applyCollapsedState(true, { persist: false });
+    applyCollapsedState(true, {
+        persist: false
+    });
 }
 
 function handleGameflowPhaseChange(phase) {
@@ -313,7 +348,7 @@ function rebuildPartyIndex(friendsArray) {
 
         const currentExplicitIds = new Set();
         let isCurrentClosed = false;
-        
+
         if (gameId && gameId !== '0' && gameId !== '') {
             currentExplicitIds.add(`game:${gameId}`);
         }
@@ -339,7 +374,7 @@ function rebuildPartyIndex(friendsArray) {
             stickySet = currentExplicitIds;
             isStickyClosed = isCurrentClosed;
         }
-        
+
         puuidToStickyIds.set(puuid, stickySet);
         puuidToPartyClosedStatus.set(puuid, isStickyClosed);
 
@@ -388,8 +423,16 @@ function rebuildPartyIndex(friendsArray) {
             assignedColorIndex = partyColorIndex++;
         }
 
-        const { solid, alpha } = generatePartyColor(assignedColorIndex);
-        const groupData = { solid, alpha, isOpen, groupId: `group-${assignedColorIndex}` };
+        const {
+            solid,
+            alpha
+        } = generatePartyColor(assignedColorIndex);
+        const groupData = {
+            solid,
+            alpha,
+            isOpen,
+            groupId: `group-${assignedColorIndex}`
+        };
 
         realMembers.forEach(id => {
             nextFriendColors.set(id, assignedColorIndex);
@@ -420,10 +463,15 @@ function updatePartyBorder(member) {
         return;
     }
 
-    const { solid, alpha, isOpen, groupId } = state;
+    const {
+        solid,
+        alpha,
+        isOpen,
+        groupId
+    } = state;
     const prevGroupId = member.getAttribute(PARTY_BORDER_ATTR);
     let lockEl = member.querySelector(`[${PARTY_LOCK_ATTR}]`);
-    
+
     const targetSvg = isOpen ? OPEN_LOCK_SVG : CLOSED_LOCK_SVG;
     const targetOpacity = isOpen ? '0.75' : '0.95';
 
@@ -473,7 +521,7 @@ function updatePartyBorder(member) {
         lockEl.innerHTML = targetSvg;
         lockEl.dataset.svg = targetSvg;
     }
-    
+
     lockEl.style.color = solid;
     lockEl.style.opacity = targetOpacity;
 }
@@ -566,7 +614,7 @@ function rebuildStatusIndex(friends) {
     cachedFriendsList.clear();
     const next = new Map();
     const nextKeysByFriend = new Map();
-    
+
     friends.forEach((friend) => {
         if (friend.puuid) cachedFriendsList.set(friend.puuid, friend);
 
@@ -1008,7 +1056,7 @@ function recreateSidebarStyles() {
         }
 
         ${methodStyles}
-		
+        
         /* Zone parameters made thin (15px wide) so it does not block clickable elements behind it */
         #snooze-sidebar-zone {
             position: fixed;
@@ -1073,7 +1121,9 @@ function recreateSidebarStyles() {
 
         .snooze-collapsed #snooze-sidebar-toggle svg { transform: rotate(${collapseMethod === 'crop' ? '0deg' : '180deg'}); }
     `;
-}function setChampSelectMode(active) {
+}
+
+function setChampSelectMode(active) {
     if (isInChampSelect === active) return;
     isInChampSelect = active;
     document.body.classList.toggle('snooze-champselect-mode', active);
@@ -1117,13 +1167,18 @@ function mountSidebarToggle() {
         const cwt = getCwtTarget();
 
         if (cwt) {
-            const targetW = isCurrentlyCollapsed && collapseMethod === 'crop'
-                ? Math.round(cwt.w * (1280 - SIDEBAR_WIDTH) / 1280)
-                : cwt.w;
+            const targetW = isCurrentlyCollapsed && collapseMethod === 'crop' ?
+                Math.round(cwt.w * (1280 - SIDEBAR_WIDTH) / 1280) :
+                cwt.w;
             Utils.Debug.log('[Snooze-SocialPanelTweaks] enforceWindowSize: cwtActive target:', cwt.w, 'x', cwt.h, '| collapsed:', isCurrentlyCollapsed, '| targetW:', targetW);
             if (window.innerWidth !== targetW || window.innerHeight !== cwt.h) {
                 Utils.Debug.log('[Snooze-SocialPanelTweaks] enforceWindowSize: MISMATCH, re-applying ResizeTo(', targetW, ',', cwt.h, ')');
-                window.riotInvoke({ request: JSON.stringify({ name: 'Window.ResizeTo', params: [targetW, cwt.h] }) });
+                window.riotInvoke({
+                    request: JSON.stringify({
+                        name: 'Window.ResizeTo',
+                        params: [targetW, cwt.h]
+                    })
+                });
             } else {
                 Utils.Debug.log('[Snooze-SocialPanelTweaks] enforceWindowSize: MATCH, no action needed');
             }
@@ -1131,13 +1186,28 @@ function mountSidebarToggle() {
             const currentRatio = w / h;
             if (collapseMethod === 'crop') {
                 if (isCurrentlyCollapsed && Math.abs(currentRatio - RATIO_16_9) < 0.05) {
-                    window.riotInvoke({ request: JSON.stringify({ name: 'Window.ResizeTo', params: [Math.round(NATIVE_HEIGHT * RATIO_COLLAPSED), NATIVE_HEIGHT] }) });
+                    window.riotInvoke({
+                        request: JSON.stringify({
+                            name: 'Window.ResizeTo',
+                            params: [Math.round(NATIVE_HEIGHT * RATIO_COLLAPSED), NATIVE_HEIGHT]
+                        })
+                    });
                 } else if (!isCurrentlyCollapsed && Math.abs(currentRatio - RATIO_COLLAPSED) < 0.05) {
-                    window.riotInvoke({ request: JSON.stringify({ name: 'Window.ResizeTo', params: [Math.round(NATIVE_HEIGHT * RATIO_16_9), NATIVE_HEIGHT] }) });
+                    window.riotInvoke({
+                        request: JSON.stringify({
+                            name: 'Window.ResizeTo',
+                            params: [Math.round(NATIVE_HEIGHT * RATIO_16_9), NATIVE_HEIGHT]
+                        })
+                    });
                 }
             } else {
                 if (Math.abs(currentRatio - RATIO_16_9) > 0.05) {
-                    window.riotInvoke({ request: JSON.stringify({ name: 'Window.ResizeTo', params: [Math.round(NATIVE_HEIGHT * RATIO_16_9), NATIVE_HEIGHT] }) });
+                    window.riotInvoke({
+                        request: JSON.stringify({
+                            name: 'Window.ResizeTo',
+                            params: [Math.round(NATIVE_HEIGHT * RATIO_16_9), NATIVE_HEIGHT]
+                        })
+                    });
                 }
             }
         }
@@ -1160,12 +1230,16 @@ function mountSidebarToggle() {
             e.preventDefault();
             e.stopPropagation();
 
-            applyCollapsedState(!document.body.classList.contains('snooze-collapsed'), { persist: true });
+            applyCollapsedState(!document.body.classList.contains('snooze-collapsed'), {
+                persist: true
+            });
             if (isChampSelectAutoUncollapseActive) {
                 isChampSelectAutoUncollapseActive = false;
                 shouldRestoreCollapseAfterChampSelect = false;
             }
-        }, { capture: true });
+        }, {
+            capture: true
+        });
     }
 }
 
@@ -1205,8 +1279,7 @@ export function init(context) {
             id: 'socialPanelTweaks',
             name: 'Social Panel Tweaks',
             description: 'Enhances the social panel with queue labels, in-game timers, connected party status visuals, and a collapsible sidebar.',
-            settings: [
-                {
+            settings: [{
                     type: 'toggle',
                     id: 'sm:socialPanelTweaks',
                     label: 'Enable Better Friends Status',
@@ -1239,10 +1312,18 @@ export function init(context) {
                     id: 'sm:collapseMethod',
                     label: 'Collapse Method',
                     value: collapseMethod,
-                    options: [
-                        { value: 'crop', label: 'Crop (Resize Window)' },
-                        { value: 'stretch', label: 'Stretch (Scale Layout)' },
-                        { value: 'slide', label: 'Slide (Shift Layout)' }
+                    options: [{
+                            value: 'crop',
+                            label: 'Crop (Resize Window)'
+                        },
+                        {
+                            value: 'stretch',
+                            label: 'Stretch (Scale Layout)'
+                        },
+                        {
+                            value: 'slide',
+                            label: 'Slide (Shift Layout)'
+                        }
                     ],
                     onChange: (val) => toggleCollapseMethod(val),
                 },
@@ -1283,10 +1364,18 @@ export function init(context) {
             plugin.appendChild(createFlatCheckbox('Highlight friends in the same lobby', isPartyGroupEnabled, togglePartyGroup));
             plugin.appendChild(createFlatCheckbox('Enable Group Folder Invite Option', isFolderInviteEnabled, toggleFolderInvite));
 
-            plugin.appendChild(Utils.Settings.createSelectRow('Collapse Method', [
-                { value: 'crop', label: 'Crop (Resize Window)' },
-                { value: 'stretch', label: 'Stretch (Scale Layout)' },
-                { value: 'slide', label: 'Slide (Shift Layout)' }
+            plugin.appendChild(Utils.Settings.createSelectRow('Collapse Method', [{
+                    value: 'crop',
+                    label: 'Crop (Resize Window)'
+                },
+                {
+                    value: 'stretch',
+                    label: 'Stretch (Scale Layout)'
+                },
+                {
+                    value: 'slide',
+                    label: 'Slide (Shift Layout)'
+                }
             ], collapseMethod, (v) => {
                 toggleCollapseMethod(v);
             }));
@@ -1361,7 +1450,7 @@ export function installEmberHook() {
                 if (isFolderInviteEnabled) {
                     const group = this.get ? this.get('group') : this.group;
                     const isMetaGroup = group?.isMetaGroup || (this.element && this.element.querySelector('.group.meta'));
-                    
+
                     if (currentGameflowPhase === 'Lobby' && !isMetaGroup) {
                         const tryInject = () => {
                             const menuEl = document.querySelector('lol-uikit-context-menu');
