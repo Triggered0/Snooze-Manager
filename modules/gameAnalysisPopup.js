@@ -1,8 +1,8 @@
 /**
  * @name Snooze-GameAnalysisPopup
- * @version 1.0.0
+ * @version 1.0.1
  * @author SnoozeFest - github@ReformedDoge
- * @description Adds game analysis enhancements with player rank and recent match history.
+ * @description Adds game analysis enhancements with player rank, recent match history and game in progress player history analysis.
  * @link https://github.com/ReformedDoge
  */
 import Utils from './generalUtils.js';
@@ -1158,7 +1158,9 @@ export function init(context) {
 
                 const idInfo = getPlayerId();
                 if (!idInfo) {
-                    Utils.Debug.log('[GameAnalysis] Player component not fully initialized yet (id returned null/empty). Skipping render.');
+                    Utils.Debug.log('[GameAnalysis] Player component not fully initialized yet (id returned null/empty). Clearing stats and skipping render.');
+                    renderStatsElements(el, { empty: true }, null);
+                    this._renderedIdKey = null;
                     return;
                 }
 
@@ -1247,17 +1249,13 @@ export function init(context) {
 
                 // Inline Champ Select Stats
                 if (!isChampSelectStatsEnabled) {
-                    const existingTop = el.querySelector('.pm-champ-select-stats-top');
-                    const existingBot = el.querySelector('.pm-champ-select-stats-bottom');
-                    if (existingTop) existingTop.remove();
-                    if (existingBot) existingBot.remove();
+                    renderStatsElements(el, { empty: true }, null);
                     this._renderedIdKey = null;
                     this._renderedStats = null;
                     return;
                 }
 
                 const trackingKey = `${idInfo.type}_${idInfo.value}`;
-                const hasStats = el.querySelector('.pm-champ-select-stats-top') !== null;
 
                 // Capture the current lobby generation at render time so we can detect stale component instances that survived a lobby/phase transition
                 const myGeneration = lobbyGeneration;
@@ -1272,13 +1270,10 @@ export function init(context) {
                     this._isLoadingStats = false;
                     this._loadingForId = null;
                     // Remove any stale DOM stat elements from the previous lobby
-                    const staleTop = el.querySelector('.pm-champ-select-stats-top');
-                    const staleBot = el.querySelector('.pm-champ-select-stats-bottom');
-                    if (staleTop) staleTop.remove();
-                    if (staleBot) staleBot.remove();
+                    renderStatsElements(el, { empty: true }, null);
                 }
 
-                const hasStatsNow = el.querySelector('.pm-champ-select-stats-top') !== null;
+                const hasStatsNow = el.querySelector('.pm-cs-stats-row') !== null || el.querySelector('.pm-rank-badge') !== null || el.querySelector('.pm-pre-badge') !== null;
 
                 // If stats are already active and correct for this lobby, skip loading logic
                 if (this._renderedIdKey === trackingKey && hasStatsNow) {
@@ -1329,6 +1324,9 @@ export function init(context) {
 
                         if (!player) {
                             Utils.Debug.warn(`[GameAnalysis] Matching player not found in team array for mapping key: ${trackingKey}`);
+                            renderStatsElements(el, { empty: true }, null);
+                            this._renderedIdKey = trackingKey;
+                            this._renderedStats = { empty: true };
                             return;
                         }
 
@@ -1342,6 +1340,9 @@ export function init(context) {
                         }
                         if (!puuid) {
                             Utils.Debug.warn('[GameAnalysis] Could not locate valid PUUID for stats loading.');
+                            renderStatsElements(el, { empty: true }, null);
+                            this._renderedIdKey = trackingKey;
+                            this._renderedStats = { empty: true };
                             return;
                         }
 
@@ -1480,10 +1481,9 @@ export function init(context) {
                     if (icon) icon.removeAttribute('data-pm-history');
 
                     // Clean up manually appended stats elements on destroy
-                    const top = this.element.querySelector('.pm-champ-select-stats-top');
-                    const bot = this.element.querySelector('.pm-champ-select-stats-bottom');
-                    if (top) top.remove();
-                    if (bot) bot.remove();
+                    ['.pm-champ-select-stats', '.pm-cs-stats-wrapper', '.pm-cs-stats-row', '.pm-pre-badge', '.pm-rank-badge'].forEach(sel => {
+                        this.element.querySelectorAll(sel).forEach(node => node.remove());
+                    });
                 }
                 this._renderedIdKey = null;
                 this._renderedStats = null;
@@ -1614,159 +1614,58 @@ export function buildMatchRow(g, player, globalIdx) {
 }
 
 function computePerformanceScores(participants, gameDuration) {
-    const gameDmg = participants.reduce((s, p) => s + (p.totalDamageDealtToChampions || 0), 0) || 1;
-    const gameGold = participants.reduce((s, p) => s + (p.goldEarned || 0), 0) || 1;
+    const players = Utils.Scoring.normalizeParticipants(participants);
+    const detailed = Utils.Scoring.computeScoresDetailed(players);
+    const { scores, entries } = detailed;
 
-    const teamKills = {};
-    participants.forEach(p => {
-        teamKills[p.teamId] = (teamKills[p.teamId] || 0) + (p.kills || 0);
-    });
+    const sorted = [...entries].sort((a, b) => b.composite - a.composite);
+    const mvpPuuid = sorted.find(e => e.win)?.puuid;
+    const acePuuid = sorted.find(e => !e.win)?.puuid;
 
-    const raw = participants.map(p => {
-        const kills = p.kills || 0;
-        const deaths = p.deaths || 0;
-        const assists = p.assists || 0;
-        const dmg = p.totalDamageDealtToChampions || 0;
-        const gold = p.goldEarned || 0;
-        const healing = (p.totalHealsOnTeammates || 0) + (p.totalDamageShieldedOnTeammates || 0);
-        const tanking = (p.totalDamageTaken || 0) + (p.damageSelfMitigated || 0);
-        const cs = (p.totalMinionsKilled || 0) + (p.neutralMinionsKilled || 0);
-        const tk = teamKills[p.teamId] || 1;
-
-        const kda = (kills + assists) / Math.max(1, deaths);
-        const kdaNorm = kda / (kda + 4);
-        const kp = (kills + assists) / Math.max(1, tk);
-        const killShare = kills / Math.max(1, tk);
-
-        const healFrac = healing / gameDmg;
-        const tankFrac = tanking / gameDmg;
-        const dmgFrac = dmg / gameDmg;
-
-        const isEnchanter = healFrac > 0.04;
-        const isTank = !isEnchanter && tankFrac > 0.12 && dmgFrac < 0.10;
-        const role = isEnchanter ? 'enchanter' : (isTank ? 'tank' : 'carry');
-
-        return {
-            puuid: p.puuid,
-            win: p.win,
-            role,
-            kdaNorm,
-            kp,
-            killShare,
-            dmg,
-            gold,
-            healing,
-            tanking,
-            _raw: {
-                kills,
-                deaths,
-                assists,
-                dmg,
-                gold,
-                cs,
-                healing,
-                tanking,
-                teamId: p.teamId,
-                champion: p.championName || p.championId
-            },
-            _inputs: {
-                kda: +kda.toFixed(3),
-                kdaNorm: +kdaNorm.toFixed(3),
-                kp: +kp.toFixed(3),
-                killShare: +killShare.toFixed(3),
-                healFrac: +healFrac.toFixed(4),
-                tankFrac: +tankFrac.toFixed(4),
-                dmgFrac: +dmgFrac.toFixed(4),
-                role,
-                teamKills: tk,
-                gameDmg
-            }
-        };
-    });
-
-    function mmNorm(arr) {
-        const mn = Math.min(...arr),
-            mx = Math.max(...arr),
-            rng = mx - mn || 1e-6;
-        return arr.map(v => (v - mn) / rng);
-    }
-
-    const kdaN = mmNorm(raw.map(p => p.kdaNorm));
-    const kpN = mmNorm(raw.map(p => p.kp));
-    const killN = mmNorm(raw.map(p => p.killShare));
-    const dmgN = mmNorm(raw.map(p => p.dmg));
-    const goldN = mmNorm(raw.map(p => p.gold));
-    const healN = mmNorm(raw.map(p => p.healing));
-    const tankN = mmNorm(raw.map(p => p.tanking));
-
-    const composites = raw.map((p, i) => {
-        let composite;
-        if (p.role === 'enchanter') {
-            composite = kdaN[i] * 0.15 + kpN[i] * 0.30 + healN[i] * 0.40 + goldN[i] * 0.15;
-        } else if (p.role === 'tank') {
-            composite = kdaN[i] * 0.20 + kpN[i] * 0.25 + tankN[i] * 0.35 + goldN[i] * 0.20;
-        } else {
-            composite = kdaN[i] * 0.25 + kpN[i] * 0.20 + killN[i] * 0.15 + dmgN[i] * 0.25 + goldN[i] * 0.15;
-        }
-
-        return {
-            puuid: p.puuid,
-            composite,
-            win: p.win,
-            _raw: p._raw,
-            _inputs: {
-                ...p._inputs,
-                kdaN: +kdaN[i].toFixed(3),
-                kpN: +kpN[i].toFixed(3),
-                killN: +killN[i].toFixed(3),
-                dmgN: +dmgN[i].toFixed(3),
-                goldN: +goldN[i].toFixed(3),
-                healN: +healN[i].toFixed(3),
-                tankN: +tankN[i].toFixed(3)
-            }
-        };
-    });
-
-    const vals = composites.map(c => c.composite);
-    const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
-    const std = Math.sqrt(vals.reduce((a, v) => a + (v - mean) ** 2, 0) / vals.length) || 1e-6;
-
-    const compositesWithScore = composites.map(c => {
-        const z = (c.composite - mean) / std;
-        let score = 5.5 + z * 1.5 + (c.win ? 0.5 : -0.5);
-        score = Math.max(1.0, Math.min(10.0, Math.round(score * 10) / 10));
-        return {
-            ...c,
-            _score: score,
-            _z: z
-        };
-    });
-
-    const sorted = [...compositesWithScore].sort((a, b) => b.composite - a.composite);
-    const mvpPuuid = sorted.find(c => c.win)?.puuid;
-    const acePuuid = sorted.find(c => !c.win)?.puuid;
-
-    const ranked = [...compositesWithScore].sort((a, b) => b._score - a._score);
+    const ranked = [...entries].sort((a, b) => b.score - a.score);
 
     const scoresMap = {};
     const debugTable = [];
 
-    ranked.forEach((c, idx) => {
-        scoresMap[c.puuid] = {
-            score: c._score.toFixed(1),
+    ranked.forEach((e, idx) => {
+        scoresMap[e.puuid] = {
+            score: e.score.toFixed(1),
             rank: idx + 1,
-            isMvp: c.puuid === mvpPuuid,
-            isAce: c.puuid === acePuuid
+            isMvp: e.puuid === mvpPuuid,
+            isAce: e.puuid === acePuuid
         };
 
         debugTable.push({
             rank: idx + 1,
-            score: c._score.toFixed(1),
-            win: c.win,
-            ...c._raw,
-            ...c._inputs,
-            composite: +c.composite.toFixed(4),
-            z: +c._z.toFixed(3)
+            score: e.score.toFixed(1),
+            win: e.win,
+            kills: e.kills,
+            deaths: e.deaths,
+            assists: e.assists,
+            dmg: e.dmg,
+            gold: e.gold,
+            cs: e.cs,
+            healing: e.healing,
+            tanking: e.tanking,
+            teamId: e.teamId,
+            champion: e.championName,
+            kda: e.kda,
+            kdaNorm: e.kdaNorm,
+            kp: e.kp,
+            killShare: e.killShare,
+            healFrac: e.healFrac,
+            tankFrac: e.tankFrac,
+            dmgFrac: e.dmgFrac,
+            role: e.role,
+            teamKills: e.teamKills,
+            gameDmg: detailed.gameDmg,
+            kdaN: e.kdaN,
+            kpN: e.kpN,
+            killN: e.killN,
+            dmgN: e.dmgN,
+            goldN: e.goldN,
+            composite: e.composite,
+            z: e.z
         });
     });
 
