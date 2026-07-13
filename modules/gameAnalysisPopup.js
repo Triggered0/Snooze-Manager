@@ -562,7 +562,7 @@ async function analyzePlayer(p, currentTag, premadeColor) {
                         return `
                     <div style="display:flex; align-items:center; gap:4px; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.05); padding:2px 6px; border-radius:4px; font-size:10px; height:22px; box-sizing:border-box;">
                         <img src="${cIcon}" style="width:16px;height:16px;border-radius:50%;">
-                        <span style="color:#f0e6d2;font-weight:600;">${stats.plays}P</span>
+                        <span style="color:#f0e6d2;font-weight:600;">${stats.plays}x</span>
                         <span style="color:${wrColor};font-weight:600;">${cWr}%</span>
                     </div>
                   `;
@@ -1063,13 +1063,13 @@ export function init(context) {
                 badgeMostPicked = `
                 <div style="display:inline-flex; align-items:center; gap:3px; background:rgba(0,0,0,0.6); padding:1px 5px; border-radius:3px; border:1px solid rgba(200,170,110,0.2); white-space:nowrap;">
                     <img src="${champIcon}" style="width:16px; height:16px; border-radius:50%; object-fit:cover;">
-                    <span style="font-size:11px; font-weight:bold; color:#a09b8c;">x${statsData.mostPickedCount}</span>
+                    <span style="font-size:11px; font-weight:bold; color:#a09b8c;">${statsData.mostPickedCount}x</span>
                 </div>
                 `;
             } else {
                 badgeMostPicked = `
                 <div style="display:inline-flex; align-items:center; gap:3px; background:rgba(0,0,0,0.6); padding:1px 5px; border-radius:3px; border:1px solid rgba(200,170,110,0.2); white-space:nowrap;">
-                    <span style="font-size:11px; font-weight:bold; color:#a09b8c;">x${statsData.mostPickedCount}</span>
+                    <span style="font-size:11px; font-weight:bold; color:#a09b8c;">${statsData.mostPickedCount}x</span>
                     <img src="${champIcon}" style="width:16px; height:16px; border-radius:50%; object-fit:cover;">
                 </div>
                 `;
