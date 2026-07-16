@@ -9,17 +9,15 @@ import Utils from './generalUtils.js';
 
 const STYLE_ID = 'snooze-use-client-in-game-style';
 
-// Hide the full-window in-progress blocker and restore the top nav bar so the
-// user can navigate the client while a game is running. Nav-bar selectors are
-// confirmed/adjusted against the live client during manual verification.
+// Hide the full-window in-progress blocker and un-hide the nav bar so the user
+// can navigate the client while a game is running. The nav bar is a persistent
+// chrome screen that stays mounted but is inline `visibility: hidden` during a
+// game; un-hiding it lets nav clicks re-mount Profile/Collection/etc. into the
+// (otherwise empty) content area. Selectors confirmed against the live client.
 const BYPASS_CSS = `
     .rcp-fe-lol-game-in-progress { display: none !important; }
-    .rcp-fe-lol-navigation-bar,
-    .lol-nav__list,
-    lol-uikit-navigation-bar {
-        display: flex !important;
+    .rcp-fe-lol-navigation {
         visibility: visible !important;
-        pointer-events: auto !important;
     }
 `;
 
