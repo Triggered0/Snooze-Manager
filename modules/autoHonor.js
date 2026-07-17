@@ -1,8 +1,8 @@
 /**
  * @name Snooze-AutoHonor
- * @version 1.0.2
+ * @version 1.0.3
  * @author SnoozeFest - github@ReformedDoge
- * @description Automatically honor players after matches with optional contribution-based selection and score display.
+ * @description Automatically honor players after matches, with optional prioritization of friends or selection based on contributions, and score display on honor cards.
  * @link https://github.com/ReformedDoge
  */
 import Utils from './generalUtils.js';
@@ -468,11 +468,22 @@ function injectFriendBadge(element, puuid) {
 
     const chip = document.createElement('div');
     chip.className = 'ah-friend-badge';
-    chip.style.cssText = 'position:absolute;top:6px;left:6px;background:rgba(10,10,22,0.75);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);border-radius:4px;padding:3px 6px;display:flex;align-items:center;gap:3px;pointer-events:none;z-index:10;';
     chip.innerHTML = `
         <span style="color:#ff6b8a;font-size:11px;text-shadow:0 0 4px rgba(0,0,0,0.9);">&#9829;</span>
         <span style="color:#e8d5a3;font-weight:700;font-size:10px;letter-spacing:0.3px;text-shadow:0 0 4px rgba(0,0,0,0.9);">Friend</span>
     `;
+
+    // Adapt to native role indicator if present
+    const roleIndicator = element.querySelector('.vote-ceremony-candidate-role');
+    if (roleIndicator) {
+        const wrapperRect = wrapper.getBoundingClientRect();
+        const roleRect = roleIndicator.getBoundingClientRect();
+        const badgeTop = roleRect.top - wrapperRect.top;
+        const badgeLeft = (roleRect.left - wrapperRect.left) + roleRect.width + 6;
+        chip.style.cssText = `position:absolute;top:${badgeTop}px;left:${badgeLeft}px;background:rgba(10,10,22,0.75);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);border-radius:4px;padding:3px 6px;display:flex;align-items:center;gap:3px;pointer-events:none;z-index:10;`;
+    } else {
+        chip.style.cssText = 'position:absolute;top:6px;left:6px;background:rgba(10,10,22,0.75);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);border-radius:4px;padding:3px 6px;display:flex;align-items:center;gap:3px;pointer-events:none;z-index:10;';
+    }
 
     wrapper.style.position = 'relative';
     wrapper.appendChild(chip);
