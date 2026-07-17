@@ -10,7 +10,16 @@ import Utils from './generalUtils.js';
 let isEnabled = false;
 let honorAttemptedForCurrentGame = false;
 let eogStatsCache = null;
+let scoresMapCache = null;
 let hookCleanups = [];
+
+function loadScoresMap() {
+    if (eogStatsCache?.teams?.length) {
+        scoresMapCache = Utils.Scoring.computeScores(Utils.Scoring.normalizeEogStats(eogStatsCache));
+    } else {
+        scoresMapCache = null;
+    }
+}
 
 function toggleFeature(enabled) {
     isEnabled = enabled;
@@ -218,6 +227,7 @@ async function getEogStatsBlock() {
     const data = await Utils.LCU.get('/lol-end-of-game/v1/eog-stats-block').catch(() => null);
     if (data?.teams?.length) {
         eogStatsCache = data;
+        loadScoresMap();
         Utils.Debug.log('[AutoHonor] eogStatsBlock cached successfully.');
     }
     return eogStatsCache;
@@ -377,43 +387,32 @@ function injectScoreOnHonorCard(element, puuid) {
     if (!element || !element.isConnected) return;
     if (element.querySelector('.ah-score-badge')) return;
 
-    (async () => {
-        try {
-            if (!element || !element.isConnected) return;
-            const eogStats = await getEogStatsBlock();
-            if (!eogStats) return;
-            if (!element || !element.isConnected) return;
+    if (!scoresMapCache) return;
+    const rating = scoresMapCache.get(puuid);
+    if (!rating) return;
 
-            const scoresMap = getScores(eogStats);
-            const rating = scoresMap.get(puuid);
-            if (!rating) return;
+    if (!element || !element.isConnected) return;
+    if (element.querySelector('.ah-score-badge')) return;
 
-            if (!element || !element.isConnected) return;
-            if (element.querySelector('.ah-score-badge')) return;
+    const wrapper = element.querySelector('.vote-ceremony-candidate-champ-image-wrapper');
+    if (!wrapper) return;
 
-            const wrapper = element.querySelector('.vote-ceremony-candidate-champ-image-wrapper');
-            if (!wrapper) return;
+    const color = scoreColor(rating._scoreRatio);
 
-            const color = scoreColor(rating._scoreRatio);
+    const chip = document.createElement('div');
+    chip.className = 'ah-score-badge';
+    chip.style.cssText = 'position:absolute;top:6px;right:6px;background:rgba(10,10,22,0.75);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);border-radius:4px;padding:4px 7px;text-align:center;line-height:1.4;pointer-events:none;z-index:10;';
 
-            const chip = document.createElement('div');
-            chip.className = 'ah-score-badge';
-            chip.style.cssText = 'position:absolute;top:6px;right:6px;background:rgba(10,10,22,0.75);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);border-radius:4px;padding:4px 7px;text-align:center;line-height:1.4;pointer-events:none;z-index:10;';
+    chip.innerHTML = `
+        <div style="color:#e8d5a3;font-weight:700;font-size:11px;letter-spacing:0.3px;text-shadow:0 0 4px rgba(0,0,0,0.9),0 0 2px rgba(0,0,0,0.9);">${rating.kills}/${rating.deaths}/${rating.assists}</div>
+        <div style="font-size:9px;display:flex;gap:6px;justify-content:center;">
+            <span style="font-weight:600;text-shadow:0 0 3px rgba(0,0,0,0.9);color:#c0b89a;">${rating.kda} KDA</span>
+            <span style="color:${color};font-weight:700;text-shadow:0 0 3px rgba(0,0,0,0.9),0 0 6px ${color}80;">Score: ${rating.score}</span>
+        </div>
+    `;
 
-            chip.innerHTML = `
-                <div style="color:#e8d5a3;font-weight:700;font-size:11px;letter-spacing:0.3px;text-shadow:0 0 4px rgba(0,0,0,0.9),0 0 2px rgba(0,0,0,0.9);">${rating.kills}/${rating.deaths}/${rating.assists}</div>
-                <div style="font-size:9px;display:flex;gap:6px;justify-content:center;">
-                    <span style="font-weight:600;text-shadow:0 0 3px rgba(0,0,0,0.9);color:#c0b89a;">${rating.kda} KDA</span>
-                    <span style="color:${color};font-weight:700;text-shadow:0 0 3px rgba(0,0,0,0.9),0 0 6px ${color}80;">Score: ${rating.score}</span>
-                </div>
-            `;
-
-            wrapper.style.position = 'relative';
-            wrapper.appendChild(chip);
-        } catch (e) {
-            Utils.Debug.warn('[AutoHonor] Score injection failed:', e);
-        }
-    })();
+    wrapper.style.position = 'relative';
+    wrapper.appendChild(chip);
 }
 
 export function load() {
@@ -434,6 +433,7 @@ export function load() {
         const statsUnsub = Utils.LCU.observe('/lol-end-of-game/v1/eog-stats-block', (event) => {
             if (event.data?.teams?.length) {
                 eogStatsCache = event.data;
+                loadScoresMap();
                 Utils.Debug.log('[AutoHonor] eogStatsBlock cached via WS push.');
                 statsUnsub();
             }
@@ -448,13 +448,17 @@ export function load() {
             if (!isHonorPhase && e.data !== 'WaitingForStats') {
                 honorAttemptedForCurrentGame = false;
                 eogStatsCache = null;
+                scoresMapCache = null;
                 return;
             }
 
             // Try to eagerly cache eogStatsBlock when phase changes
             if (['PreEndOfGame', 'WaitingForStats', 'EndOfGame'].includes(e.data) && !eogStatsCache) {
                 Utils.LCU.get('/lol-end-of-game/v1/eog-stats-block').then(data => {
-                    if (data?.teams?.length) eogStatsCache = data;
+                    if (data?.teams?.length) {
+                        eogStatsCache = data;
+                        loadScoresMap();
+                    }
                 }).catch(() => {});
             }
 
