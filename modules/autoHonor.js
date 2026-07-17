@@ -10,6 +10,7 @@ import Utils from './generalUtils.js';
 let isEnabled = false;
 let honorAttemptedForCurrentGame = false;
 let eogStatsCache = null;
+let friendPuuidsCache = null;
 let scoresMapCache = null;
 let hookCleanups = [];
 
@@ -92,6 +93,8 @@ function renderExtraSettings(container) {
         if (next) {
             Utils.Store.set('autoHonor', 'prioritizeByContribution', false);
             uncheckToggleRow(container.querySelector('.ah-prioritize-toggle'));
+            Utils.Store.set('autoHonor', 'preferFriends', false);
+            uncheckToggleRow(container.querySelector('.ah-prefer-friends-row'));
         }
     });
     skipRow.classList.add('ah-skip-honor-row');
@@ -107,6 +110,17 @@ function renderExtraSettings(container) {
     });
     prioRow.classList.add('ah-prioritize-toggle');
     container.appendChild(prioRow);
+
+    // Prefer Friends toggle — honor friends first out of the current mode's candidates
+    const preferRow = Utils.Settings.createToggleRow('Prefer Friends', Utils.Store.get('autoHonor', 'preferFriends') || false, (next) => {
+        Utils.Store.set('autoHonor', 'preferFriends', next);
+        if (next) {
+            Utils.Store.set('autoHonor', 'skip', false);
+            uncheckToggleRow(container.querySelector('.ah-skip-honor-row'));
+        }
+    });
+    preferRow.classList.add('ah-prefer-friends-row');
+    container.appendChild(preferRow);
 }
 
 export function init(context) {
@@ -222,6 +236,19 @@ async function triggerAutoHonorIfReady() {
     autoHonorTeammate();
 }
 
+async function getFriendPuuids() {
+    if (friendPuuidsCache) return friendPuuidsCache;
+    const friends = await Utils.LCU.get('/lol-chat/v1/friends').catch(() => null);
+    const set = new Set();
+    if (Array.isArray(friends)) {
+        for (const f of friends) {
+            if (f?.puuid) set.add(f.puuid);
+        }
+    }
+    friendPuuidsCache = set;
+    return set;
+}
+
 async function getEogStatsBlock() {
     if (eogStatsCache) return eogStatsCache;
     const data = await Utils.LCU.get('/lol-end-of-game/v1/eog-stats-block').catch(() => null);
@@ -295,6 +322,19 @@ async function autoHonorTeammate() {
             if (mode === 'allies') candidates = [...(ballot.eligibleAllies || [])];
             else if (mode === 'enemies') candidates = [...(ballot.eligibleOpponents || [])];
             else if (mode === 'random') candidates = [...(ballot.eligibleAllies || []), ...(ballot.eligibleOpponents || [])];
+
+            const preferFriends = Utils.Store.get('autoHonor', 'preferFriends') || false;
+            if (preferFriends) {
+                const friendPuuids = await getFriendPuuids();
+                const friendCandidates = candidates.filter(c => friendPuuids.has(c.puuid));
+                if (friendCandidates.length) {
+                    Utils.Debug.log(`[AutoHonor] Prefer Friends: ${friendCandidates.length} friend(s) in match.`);
+                    candidates = friendCandidates;
+                } else {
+                    Utils.Debug.log('[AutoHonor] Prefer Friends: no friend in match. Falling back to current mode.');
+                    // leave candidates unchanged — honor per the selected mode
+                }
+            }
 
             const voteCount = ballot.votePool?.votes || 1;
             Utils.Debug.log(`[AutoHonor] Target mode: "${mode}", candidates: ${candidates.length}, votes: ${voteCount}`);
@@ -415,6 +455,29 @@ function injectScoreOnHonorCard(element, puuid) {
     wrapper.appendChild(chip);
 }
 
+function injectFriendBadge(element, puuid) {
+    if (!element || !element.isConnected) return;
+    if (element.querySelector('.ah-friend-badge')) return;
+    if (!friendPuuidsCache) return;
+    if (!friendPuuidsCache.has(puuid)) return;
+    if (!element || !element.isConnected) return;
+    if (element.querySelector('.ah-friend-badge')) return;
+
+    const wrapper = element.querySelector('.vote-ceremony-candidate-champ-image-wrapper');
+    if (!wrapper) return;
+
+    const chip = document.createElement('div');
+    chip.className = 'ah-friend-badge';
+    chip.style.cssText = 'position:absolute;top:6px;left:6px;background:rgba(10,10,22,0.75);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);border-radius:4px;padding:3px 6px;display:flex;align-items:center;gap:3px;pointer-events:none;z-index:10;';
+    chip.innerHTML = `
+        <span style="color:#ff6b8a;font-size:11px;text-shadow:0 0 4px rgba(0,0,0,0.9);">&#9829;</span>
+        <span style="color:#e8d5a3;font-weight:700;font-size:10px;letter-spacing:0.3px;text-shadow:0 0 4px rgba(0,0,0,0.9);">Friend</span>
+    `;
+
+    wrapper.style.position = 'relative';
+    wrapper.appendChild(chip);
+}
+
 export function load() {
     Utils.Debug.log('[AutoHonor] Module loaded.');
 
@@ -422,11 +485,23 @@ export function load() {
     if (!document.getElementById('ah-badge-font')) {
         const s = document.createElement('style');
         s.id = 'ah-badge-font';
-        s.textContent = '.ah-score-badge,.ah-score-badge *{font-family:"Segoe UI","Helvetica Neue",Arial,sans-serif !important}';
+        s.textContent = '.ah-score-badge,.ah-score-badge *,.ah-friend-badge,.ah-friend-badge *{font-family:"Segoe UI","Helvetica Neue",Arial,sans-serif !important}';
         document.head.appendChild(s);
     }
 
     const scoreOnCard = () => Utils.Store.get('autoHonor', 'showScoreOnCard');
+    const preferFriends = () => Utils.Store.get('autoHonor', 'preferFriends');
+    if (Utils.LCU?.get && preferFriends()) {
+        Utils.LCU.get('/lol-chat/v1/friends').then(friends => {
+            const set = new Set();
+            if (Array.isArray(friends)) {
+                for (const f of friends) {
+                    if (f?.puuid) set.add(f.puuid);
+                }
+            }
+            friendPuuidsCache = set;
+        }).catch(() => {});
+    }
 
     // Pre-populate eogStatsBlock cache via WS observation (fast path)
     if (Utils.LCU?.observe && (Utils.Store.get('autoHonor', 'enabled') || scoreOnCard())) {
@@ -448,6 +523,7 @@ export function load() {
             if (!isHonorPhase && e.data !== 'WaitingForStats') {
                 honorAttemptedForCurrentGame = false;
                 eogStatsCache = null;
+                friendPuuidsCache = null;
                 scoresMapCache = null;
                 return;
             }
@@ -470,10 +546,10 @@ export function load() {
         Utils.Debug.log('[AutoHonor] Gameflow observer registered.');
     }
 
-    // Register Ember hook for showing KDA/score on honor cards — only when toggle is on
-    if (Utils.Hooks?.Ember?.registerRule && scoreOnCard()) {
+    // Register Ember hook for honor-card badges — score and/or friend marker
+    if (Utils.Hooks?.Ember?.registerRule && (scoreOnCard() || preferFriends())) {
         const cleanup = Utils.Hooks.Ember.registerRule({
-            name: 'ah-honor-card-score',
+            name: 'ah-honor-card-badges',
             matcher: (args) => {
                 for (const a of args) {
                     if (a && typeof a === 'object' && a.baseClassName === 'vote-ceremony-player-card') {
@@ -486,18 +562,24 @@ export function load() {
                 name: 'didRender',
                 callback(Ember, original, ...args) {
                     original(...args);
-                    if (!this.element || !scoreOnCard()) return;
-                    if (this.element.querySelector('.ah-score-badge')) return;
+                    if (!this.element) return;
+                    if (!scoreOnCard() && !preferFriends()) return;
 
                     const candidate = this.get && this.get('candidate');
                     if (!candidate?.puuid) return;
 
-                    Utils.Debug.log('[AutoHonor] Injecting score badge for', candidate.puuid);
-                    injectScoreOnHonorCard(this.element, candidate.puuid);
+                    if (scoreOnCard() && !this.element.querySelector('.ah-score-badge')) {
+                        Utils.Debug.log('[AutoHonor] Injecting score badge for', candidate.puuid);
+                        injectScoreOnHonorCard(this.element, candidate.puuid);
+                    }
+                    if (preferFriends() && !this.element.querySelector('.ah-friend-badge')) {
+                        Utils.Debug.log('[AutoHonor] Injecting friend badge for', candidate.puuid);
+                        injectFriendBadge(this.element, candidate.puuid);
+                    }
                 }
             }]
         });
         hookCleanups.push(cleanup);
-        Utils.Debug.log('[AutoHonor] Honor card score display hook registered.');
+        Utils.Debug.log('[AutoHonor] Honor card badge hook registered.');
     }
 }
