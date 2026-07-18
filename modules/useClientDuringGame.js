@@ -19,6 +19,13 @@ const BYPASS_CSS = `
     .rcp-fe-lol-navigation {
         visibility: visible !important;
     }
+    /* Block queueing a new game while a match is live. */
+    .rcp-fe-lol-parties-button,
+    .rcp-fe-lol-navigation-play-button {
+        pointer-events: none !important;
+        opacity: 0.4 !important;
+        cursor: default !important;
+    }
 `;
 
 let _currentPhase = null;
