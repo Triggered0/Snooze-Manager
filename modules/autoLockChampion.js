@@ -895,7 +895,9 @@ function chooseChampionForAction(session, action, role) {
     const currentChampionId = Number(action.championId || 0);
 
     if (currentChampionId && priorities.includes(currentChampionId)) {
-        return currentChampionId;
+        if (!bannedIds.has(currentChampionId) && (actionType !== 'pick' || !pickedIds.has(currentChampionId))) {
+            return currentChampionId;
+        }
     }
 
     return priorities.find((championId) => {

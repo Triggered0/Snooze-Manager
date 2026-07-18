@@ -178,7 +178,7 @@ export function load() {
             }
         });
 
-        Utils.LCU.observe('/lol-matchmaking/v1/notifications', e => {
+        Utils.LCU.observe('/lol-lobby/v2/notifications', e => {
             if (!e.data || !Utils.Store.get('autoAccept', EXIT_ON_DODGE_KEY)) return;
             const notifications = Array.isArray(e.data) ? e.data : [e.data];
             for (const n of notifications) {
