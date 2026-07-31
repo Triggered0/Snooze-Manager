@@ -24,6 +24,9 @@ const NAME_MAP = {
     'CLASSIC': t("Summoner's Rift"),
     'ARAM': t('ARAM'),
     'CHERRY': t('Arena'),
+    'KIWI': t('ARAM: Mayhem'),
+    'KIWI_JADE': t('Mayhem (Classic)'),
+    'JADE': t('SR (Classic)'),
     'TFT': t('Teamfight Tactics'),
     'TUTORIAL': t('Tutorial'),
     'PRACTICETOOL': t('Practice Tool')
@@ -62,6 +65,27 @@ function refreshCSS() {
     hiddenModes.forEach(mode => css += `div[data-game-mode="${mode}"] { display: none !important; }\n`);
     hiddenQueues.forEach(qId => css += `div.parties-game-type-card-category-div:has([data-queue-id="${qId}"]) { display: none !important; }\n`);
 
+    css += `.parties-game-select-screen.compact .parties-game-type-select-wrapper .game-type-card { width: 220px !important; }\n`;
+
+    // adapt spacing to how many cards are visible in compact layout
+    if (hiddenModes.size > 0) {
+        let visibleCount = 0;
+        if (partiesViewInstance && partiesViewInstance.element) {
+            const cards = partiesViewInstance.element.querySelectorAll('.game-type-card');
+            visibleCount = Array.from(cards).filter(
+                card => !hiddenModes.has(card.getAttribute('data-game-mode'))
+            ).length;
+        }
+
+        if (visibleCount <= 1) {
+            css += `.parties-game-select-screen.compact .parties-game-type-select-wrapper { justify-content: center !important; }\n`;
+        } else if (visibleCount === 2) {
+            css += `.parties-game-select-screen.compact .parties-game-type-select-wrapper { justify-content: center !important; gap: 48px !important; }\n`;
+        } else {
+            css += `.parties-game-select-screen.compact .parties-game-type-select-wrapper { justify-content: space-evenly !important; }\n`;
+        }
+    }
+
     // hide the separator logic
     const leftHidden = hiddenNavs.has('kPvP') && hiddenNavs.has('kVersusAI') && hiddenNavs.has('kTraining');
     const rightHidden = hiddenNavs.has('CreateCustom') && hiddenNavs.has('JoinCustom');
@@ -71,8 +95,16 @@ function refreshCSS() {
 
     styleEl.textContent = css;
     if (EmberRef && partiesViewInstance) {
-        EmberRef.run.scheduleOnce('afterRender', null, enforceValidSelection);
+        EmberRef.run.scheduleOnce('afterRender', null, () => {
+            stripCompactClass();
+            enforceValidSelection();
+        });
     }
+}
+
+function stripCompactClass() {
+    if (!isEnabled) return;
+    document.querySelectorAll('.game-type-card.compact').forEach(el => el.classList.remove('compact'));
 }
 
 function findComponentByElementId(view, id) {
@@ -448,7 +480,10 @@ export function installEmberHook() {
                 checkHiddenSelectionChange() {
                     if (!isEnabled) return;
                     partiesViewInstance = this;
-                    Ember.run.scheduleOnce('afterRender', null, enforceValidSelection);
+                    Ember.run.scheduleOnce('afterRender', null, () => {
+                        stripCompactClass();
+                        enforceValidSelection();
+                    });
                 },
                 didRender() {
                     partiesViewInstance = this;
@@ -457,6 +492,7 @@ export function installEmberHook() {
                     if (!isEnabled) return;
 
                     refreshCSS();
+                    stripCompactClass();
                     injectButton();
                     Ember.run.scheduleOnce('afterRender', null, enforceValidSelection);
                 },
