@@ -1,6 +1,6 @@
 /**
  * @name Snooze-Manager
- * @version 1.0.2
+ * @version 1.1.0
  * @author SnoozeFest - github@ReformedDoge
  * @description Modular plugin manager
  * @link https://github.com/ReformedDoge
@@ -107,6 +107,12 @@ export async function checkForUpdates(force = false) {
         }
         if (_updateBadgeCallback) _updateBadgeCallback(_latestRelease);
         if (_welcomeUpdateCallback) _welcomeUpdateCallback(_latestRelease);
+        if (_latestRelease) {
+            Utils.Toast.warning(
+                t('Snooze-Manager update available: v{{version}} — check Settings > Updates!', { version: _latestRelease.version }),
+                { duration: 10000, closable: true, position: 'bottom-right' }
+            );
+        }
     } catch (err) {
         Utils.Debug.warn('[Snooze-Manager] Update check failed:', err);
     } finally {
@@ -131,7 +137,7 @@ const Modal = (function() {
             style.textContent = `
       #pm-root { position: fixed; inset: 0; z-index: 2147483647; display: none; align-items: center; justify-content: center; font-family: var(--font-body), "Segoe UI", sans-serif; }
       #pm-root.pm-show { display: flex; }
-      #pm-overlay { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.45); backdrop-filter: blur(3px); pointer-events: auto; }
+      #pm-overlay { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.45); backdrop-filter: blur(2px); pointer-events: auto; }
       #pm-modal { position: relative; z-index: 1; width: 850px; height: 600px; max-height: 85vh; background: rgba(1, 10, 19, 0.75); border: 1px solid rgba(200, 170, 110, 0.2); border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; color: #a09b8c; box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.05); backdrop-filter: blur(25px) saturate(140%); pointer-events: auto; }
       .pm-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid rgba(255, 255, 255, 0.06); background: rgba(0, 0, 0, 0.2); flex-shrink: 0; }
       .pm-title { color: #f0e6d2; font-size: 20px; font-weight: bold; margin: 0; text-transform: uppercase; letter-spacing: 1px; }
@@ -876,7 +882,7 @@ const Modal = (function() {
                 } else {
                     const span = document.createElement('span');
                     span.style.color = '#3a5060';
-                    span.textContent = t("Current version: v{{version}} — up to date", { version: CURRENT_VERSION });
+                    span.textContent = t("Current version: v{{version}} - up to date", { version: CURRENT_VERSION });
                     updateStatusEl.appendChild(span);
                 }
             }
@@ -1372,7 +1378,7 @@ const WelcomeModal = (function() {
             style.textContent = `
       #pm-welcome-root { position: fixed; inset: 0; z-index: 2147483647; display: none; align-items: center; justify-content: center; padding: 24px; font-family: var(--font-body), "Segoe UI", sans-serif; color: #a09b8c; }
       #pm-welcome-root.pm-welcome-show { display: flex; }
-      #pm-welcome-overlay { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.58); backdrop-filter: blur(5px); pointer-events: auto; }
+      #pm-welcome-overlay { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.58); backdrop-filter: blur(2px); pointer-events: auto; }
       #pm-welcome-modal { position: relative; z-index: 1; width: min(760px, calc(100vw - 48px)); max-height: calc(100vh - 48px); overflow: hidden; display: flex; flex-direction: column; background: radial-gradient(circle at 50% 0%, rgba(10, 200, 185, 0.14), transparent 32%), linear-gradient(180deg, rgba(1, 10, 19, 0.96), rgba(1, 10, 19, 0.88)); border: 1px solid rgba(200, 170, 110, 0.32); border-radius: 12px; box-shadow: 0 22px 60px rgba(0, 0, 0, 0.78), inset 0 1px 0 rgba(255, 255, 255, 0.06); backdrop-filter: blur(24px) saturate(140%); pointer-events: auto; }
       .pm-welcome-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px 22px 14px; border-bottom: 1px solid rgba(255, 255, 255, 0.06); background: rgba(0, 0, 0, 0.18); }
       .pm-welcome-kicker { color: #c8aa6e; font-size: 12px; font-weight: 700; text-transform: uppercase; margin-bottom: 5px; }
@@ -1512,7 +1518,7 @@ const WelcomeModal = (function() {
             t('Auto features for re-queue, auto accept, champion select, and honor'),
             t('Champion select quality-of-life options, Dodge Button'),
             t('Client window, profile, social panel, and mode selector tweaks'),
-            t('Whale Helper loot and skin collection utilities'),
+            t('Whales Helper loot and skin collection utilities'),
             t('And more...'),
         ].forEach(feature => {
             const item = document.createElement('li');
@@ -1719,7 +1725,7 @@ const MODULE_INFO = {
         name: t('Champ Select Quit Button')
     },
     SnoozeBalanceTooltip: {
-        name: t('Balance Tooltip')
+        name: t('Mode Balance Info')
     },
     gameAnalysisPopup: {
         name: t('Game Analysis Popup')
@@ -1743,7 +1749,7 @@ const MODULE_INFO = {
         name: t('Social Panel Tweaks')
     },
     whaleHelper: {
-        name: t('Whale Helper')
+        name: t('Whales Helper')
     },
     lowPrioWarningSuppress: {
         name: t('Low Prio Warning Suppress')
@@ -1857,10 +1863,24 @@ export async function load(context) {
     Modal.init();
     WelcomeModal.init();
 
-    // Sync version from @version tag then check for updates if enabled
+    // Sync version from @version tag
     await syncVersionWithMetadata();
     WelcomeModal.showIfNeeded();
-    checkForUpdates();
+
+    // Run the update check once the client UI shell is fully loaded.
+    const runUpdateCheck = (path) => {
+        Utils.Debug.log(`[Snooze-Manager] Update check: ${path}`);
+        checkForUpdates();
+    };
+    const rcp = (context && context.rcp) || window.rcp;
+    if (rcp && typeof rcp.whenReady === "function") {
+        rcp.whenReady("rcp-fe-lol-social").then(
+            () => runUpdateCheck("rcp-fe-lol-social ready"),
+            () => runUpdateCheck("rcp-fe-lol-social rejected"),
+        );
+    } else {
+        runUpdateCheck("no rcp available (immediate)");
+    }
 
     await runModuleLifecycle('load');
 }

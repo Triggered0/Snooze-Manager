@@ -5,8 +5,7 @@
  * @description Dismiss the "game in progress" screen so you can browse the client during a live game.
  * @link https://github.com/ReformedDoge
  */
-import Utils from './generalUtils.js';
-import { t } from './i18n.js';
+import Utils, { t } from './generalUtils.js';
 
 const STYLE_ID = 'snooze-use-client-in-game-style';
 
@@ -103,7 +102,7 @@ export function init(context) {
 
 export async function load() {
     if (!Utils.LCU || !Utils.LCU.observe) {
-        Utils.Debug.log('[UseClientInGame]', 'ERROR: Utils.LCU.observe unavailable — module inactive.');
+        Utils.Debug.log('[UseClientInGame]', 'ERROR: Utils.LCU.observe unavailable - module inactive.');
         return;
     }
 
