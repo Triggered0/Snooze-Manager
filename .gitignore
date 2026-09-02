@@ -1,5 +1,6 @@
 update-contributors.py
 .contributor-cache.json
+docs/
 .serena/
 .agents/
 .mcp.json
