@@ -17,7 +17,8 @@ export const SUPPORTED_LANGUAGES = {
     "kr": "한국어",
     "cn": "中文",
     "pt-BR": "Português (Brasil)",
-    "tr": "Türkçe"
+    "tr": "Türkçe",
+    "vi": "Tiếng Việt"
 };
 
 /**
