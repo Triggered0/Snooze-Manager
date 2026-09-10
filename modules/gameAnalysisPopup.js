@@ -668,7 +668,7 @@ const showGameAnalysis = async () => {
         .pm-analysis-btn-close:hover { color:#f0e6d2; }
       </style>
       <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #3e2e13;padding-bottom:12px;margin-bottom:16px;">
-        <h2 style="margin:0;color:#c8aa6e;font-size:20px;text-transform:uppercase;letter-spacing:1px;">${t("Game Analysis")}</h2>
+        <h2 style="margin:0;color:#c8aa6e;font-size:20px;text-transform:uppercase;letter-spacing:1px;">${t("Player Analysis")}</h2>
         <button class="pm-analysis-btn-close" onclick="window._pmCloseAnalysisModal(this)">${t('✕')}</button>
       </div>
       <div class="pm-analysis-content" style="text-align:center;color:#c8aa6e;margin-top:20px;">
@@ -759,7 +759,7 @@ function handleGameAnalysisPhase(phase) {
                     if (!document.getElementById('pm-analysis-btn')) {
                         const btn = document.createElement('lol-uikit-flat-button');
                         btn.id = 'pm-analysis-btn';
-                        btn.textContent = t('Game Analysis');
+                        btn.textContent = t('Player Analysis');
                         btn.style.cssText = 'margin-top: 12px; width: 100%;';
                         btn.onclick = showGameAnalysis;
                         container.appendChild(btn);
@@ -816,7 +816,7 @@ export function init(context) {
             settings: [{
                     type: 'toggle',
                     id: 'sm:gameAnalysisPopup',
-                    label: t('Enable Game Analysis Popup'),
+                    label: t('Enable Player Analysis Popup'),
                     value: isEnabled,
                     onChange: (val) => toggleFeature(val)
                 },
@@ -856,7 +856,7 @@ export function init(context) {
         });
     } else {
         Utils.DOM.observer.observe("lol-uikit-scrollable.analysis-popup-settings", (plugin) => {
-            const row1 = Utils.Settings.createToggleRow(t("Enable Game Analysis Popup"), isEnabled, (next) => {
+            const row1 = Utils.Settings.createToggleRow(t("Enable Player Analysis Popup"), isEnabled, (next) => {
                 isEnabled = next;
                 toggleFeature(isEnabled);
             });
