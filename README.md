@@ -18,7 +18,6 @@ The plugin UI is fully translated and switches language from Settings: English (
 - `Auto Queue`: Automatically re-queues your chosen game mode after a match ends, with configurable delay (5 seconds by default).
 - `Auto Select`: Automatically hovers, locks, or bans champions by priority & role in champion select, with separate top-3 prio lists per role. Hover-then-lock delay, "Respect Team Intent" (never auto-ban what a teammate wants) & "Allow Manual Pick" are supported, plus a searchable champ picker.
 - `Mode Balance Info`: Hover over champions (ARAM/Swiftplay/URF/Arena/...) to see balance adjustments & raw stat changes.
-- `Champ Select Dodge`: Adds a dodge button inside the champion select action bar.
 - `Client Window Tweaks`: Apply custom client resolution, window title & drag bar.
 - `Custom Online Status`: Change your online status & status message. Configurable via the menu or when clicking the online indicator below your icon.
 - `Penalty UI Suppression`: Suppresses low priority queue, leaverbuster & queue failure warning dialogs, plus the chat/ranked restriction info tooltip. Old setting is migrated after the rename.
