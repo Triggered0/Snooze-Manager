@@ -21,43 +21,59 @@ function toggleFeature(enabled) {
 
 async function dodgeQueue() {
     Utils.Debug.log('[DodgeButton] Initiating champion select dodge...');
-    let succeeded = false;
 
-    // 1. Primary: Official Riot champion select quit endpoint
+    // 1. Detect if this is a custom game or practice tool lobby
+    let isCustom = false;
     try {
-        await Utils.LCU.post('/lol-lobby-team-builder/champ-select/v1/session/quit', {});
-        Utils.Debug.log('[DodgeButton] /lol-lobby-team-builder/champ-select/v1/session/quit succeeded');
-        succeeded = true;
-    } catch (err) {
-        Utils.Debug.warn('[DodgeButton] team-builder session quit failed:', err);
-        // Fallback: gameflow dodge endpoint
+        const gf = await Utils.LCU.get('/lol-gameflow/v1/session').catch(() => null);
+        if (gf?.gameData?.isCustomGame) {
+            isCustom = true;
+        } else {
+            const cs = await Utils.LCU.get('/lol-champ-select/v1/session').catch(() => null);
+            if (cs?.isCustomGame || cs?.isLegacyChampSelect) {
+                isCustom = true;
+            }
+        }
+    } catch (e) {}
+
+    // Case A: Custom Game / Practice Tool -> Clean exit via LCU endpoint without restarting UX
+    if (isCustom) {
+        Utils.Debug.log('[DodgeButton] Custom game detected, using direct lobby cancel endpoints.');
         try {
-            await Utils.LCU.post('/lol-gameflow/v1/session/dodge', {});
-            Utils.Debug.log('[DodgeButton] /lol-gameflow/v1/session/dodge sent');
-            succeeded = true;
-        } catch (dodgeErr) {
-            Utils.Debug.warn('[DodgeButton] gameflow dodge failed:', dodgeErr);
+            await Utils.LCU.post('/lol-lobby-team-builder/champ-select/v1/session/quit', {});
+        } catch (e) {}
+        try {
+            await Utils.LCU.post('/lol-lobby/v1/lobby/custom/cancel-champ-select', {});
+        } catch (e) {}
+
+        const cancelSearch = async () => {
+            try { await Utils.LCU.delete('/lol-lobby/v2/lobby/matchmaking/search'); } catch (e) {}
+            try { await Utils.LCU.delete('/lol-matchmaking/v1/search'); } catch (e) {}
+        };
+        await cancelSearch();
+        setTimeout(cancelSearch, 300);
+        return true;
+    }
+
+    // Case B: Matchmade Queues (Ranked, Normal, ARAM, Arena, Swiftplay)
+    // In matchmade queues, Riot servers strictly require a client disconnect to trigger dodge.
+    // We execute an instant UX restart: it terminates LeagueClientUx (dropping the connection and triggering the server dodge),
+    // and Riot Client immediately re-launches the client into the main menu in ~3 seconds.
+    Utils.Debug.log('[DodgeButton] Matchmade queue detected, restarting UX to trigger server-side dodge.');
+    try {
+        await Utils.LCU.post('/riotclient/kill-and-restart-ux', {});
+    } catch (err) {
+        Utils.Debug.warn('[DodgeButton] LCU kill-and-restart-ux failed, trying direct fetch:', err);
+        try {
+            await fetch('/riotclient/kill-and-restart-ux', { method: 'POST' });
+        } catch (fetchErr) {
+            Utils.Debug.error('[DodgeButton] kill-and-restart-ux failed, trying process quit fallback:', fetchErr);
+            try {
+                await Utils.LCU.post('/process-control/v1/process/quit', {});
+            } catch (quitErr) {}
         }
     }
-
-    // Fallback: Custom lobby champ-select cancel
-    try {
-        await Utils.LCU.post('/lol-lobby/v1/lobby/custom/cancel-champ-select', {});
-        Utils.Debug.log('[DodgeButton] /lol-lobby/v1/lobby/custom/cancel-champ-select sent');
-    } catch (err) {
-        Utils.Debug.debug('[DodgeButton] custom cancel-champ-select skipped or failed:', err);
-    }
-
-    // 2. Clean up matchmaking search state so the client doesn't get stuck in "Finding Match (0:00)"
-    const cancelSearch = async () => {
-        try { await Utils.LCU.delete('/lol-lobby/v2/lobby/matchmaking/search'); } catch (e) {}
-        try { await Utils.LCU.delete('/lol-matchmaking/v1/search'); } catch (e) {}
-    };
-
-    await cancelSearch();
-    setTimeout(cancelSearch, 300);
-
-    return succeeded;
+    return true;
 }
 
 export function init(context) {
@@ -96,13 +112,15 @@ export function init(context) {
                         if (dodging) return;
                         dodging = true;
                         btn.disabled = true;
+                        btn.textContent = t('Dodging...');
                         try {
                             await dodgeQueue();
                         } finally {
                             setTimeout(() => {
                                 dodging = false;
                                 btn.disabled = false;
-                            }, 1000);
+                                btn.textContent = t('Dodge');
+                            }, 1500);
                         }
                     };
 
