@@ -30,24 +30,32 @@ async function dodgeQueue() {
         succeeded = true;
     } catch (err) {
         Utils.Debug.warn('[DodgeButton] team-builder session quit failed:', err);
+        // Fallback: gameflow dodge endpoint
+        try {
+            await Utils.LCU.post('/lol-gameflow/v1/session/dodge', {});
+            Utils.Debug.log('[DodgeButton] /lol-gameflow/v1/session/dodge sent');
+            succeeded = true;
+        } catch (dodgeErr) {
+            Utils.Debug.warn('[DodgeButton] gameflow dodge failed:', dodgeErr);
+        }
     }
 
-    // 2. Secondary: LCU gameflow dodge endpoint (fallback / reinforcement)
-    try {
-        await Utils.LCU.post('/lol-gameflow/v1/session/dodge', {});
-        Utils.Debug.log('[DodgeButton] /lol-gameflow/v1/session/dodge sent');
-        succeeded = true;
-    } catch (err) {
-        Utils.Debug.warn('[DodgeButton] gameflow dodge failed:', err);
-    }
-
-    // 3. Fallback: Custom lobby champ-select cancel
+    // Fallback: Custom lobby champ-select cancel
     try {
         await Utils.LCU.post('/lol-lobby/v1/lobby/custom/cancel-champ-select', {});
         Utils.Debug.log('[DodgeButton] /lol-lobby/v1/lobby/custom/cancel-champ-select sent');
     } catch (err) {
         Utils.Debug.debug('[DodgeButton] custom cancel-champ-select skipped or failed:', err);
     }
+
+    // 2. Clean up matchmaking search state so the client doesn't get stuck in "Finding Match (0:00)"
+    const cancelSearch = async () => {
+        try { await Utils.LCU.delete('/lol-lobby/v2/lobby/matchmaking/search'); } catch (e) {}
+        try { await Utils.LCU.delete('/lol-matchmaking/v1/search'); } catch (e) {}
+    };
+
+    await cancelSearch();
+    setTimeout(cancelSearch, 300);
 
     return succeeded;
 }
