@@ -41,6 +41,7 @@ let autoAppliedForGame = false;
 let lastGameId = null;
 let widgetElement = null;
 let isWidgetCollapsed = false;
+let currentPhase = null;
 
 // In-memory runtime cache for the entire client session
 const buildsCache = new Map();
@@ -1453,12 +1454,17 @@ function applyWidgetAppearance(el) {
 }
 
 function renderWidget(champId, position, builds) {
-    createWidgetStyles();
-
-    if (!showWidget) {
+    if (currentPhase && currentPhase !== 'ChampSelect') {
         removeWidget();
         return;
     }
+
+    if (!showWidget || !isEnabled) {
+        removeWidget();
+        return;
+    }
+
+    createWidgetStyles();
 
     const hasChamp = Boolean(champId && champId > 0);
     const champName = hasChamp 
@@ -1663,6 +1669,8 @@ function removeWidget() {
         widgetElement.remove();
         widgetElement = null;
     }
+    const nodes = document.querySelectorAll('#snooze-rune-widget');
+    nodes.forEach(el => el.remove());
 }
 
 function setupDraggable(el) {
@@ -1767,7 +1775,12 @@ function isRuneSelectionSupported(session) {
 // ---------------------------------------------------------
 
 async function onChampSelectSession(session) {
-    if (!isEnabled || !session || !isRuneSelectionSupported(session)) {
+    if (currentPhase && currentPhase !== 'ChampSelect') {
+        removeWidget();
+        return;
+    }
+
+    if (!isEnabled || !session || !session.gameId || !isRuneSelectionSupported(session)) {
         removeWidget();
         return;
     }
@@ -1793,7 +1806,11 @@ async function onChampSelectSession(session) {
         myCell = session.myTeam[0];
     }
     if (!myCell) {
-        if (!widgetElement) renderWidget(0, '', []);
+        if (currentPhase === 'ChampSelect' && !widgetElement) {
+            renderWidget(0, '', []);
+        } else if (currentPhase !== 'ChampSelect') {
+            removeWidget();
+        }
         return;
     }
 
@@ -2227,21 +2244,32 @@ export function load() {
     if (Utils.LCU?.observe) {
         if (sessionUnsub) sessionUnsub();
         sessionUnsub = Utils.LCU.observe('/lol-champ-select/v1/session', (e) => {
-            onChampSelectSession(e.data);
+            const data = (typeof e === 'object' && e !== null && 'data' in e) ? e.data : e;
+            onChampSelectSession(data);
         });
 
         if (gameflowUnsub) gameflowUnsub();
         gameflowUnsub = Utils.LCU.observe('/lol-gameflow/v1/gameflow-phase', (e) => {
-            if (e.data !== 'ChampSelect') {
+            const phase = (typeof e === 'object' && e !== null && 'data' in e) ? e.data : e;
+            currentPhase = phase;
+            if (phase !== 'ChampSelect') {
                 removeWidget();
                 currentChampionId = 0;
+                currentSession = null;
             } else {
                 Utils.LCU.get('/lol-champ-select/v1/session').then(onChampSelectSession).catch(() => {});
             }
         });
 
-        // Initial fetch in case already inside ChampSelect
-        Utils.LCU.get('/lol-champ-select/v1/session').then(onChampSelectSession).catch(() => {});
+        // Initial phase query
+        Utils.LCU.get('/lol-gameflow/v1/gameflow-phase').then(phase => {
+            currentPhase = (typeof phase === 'string') ? phase : phase?.data;
+            if (currentPhase === 'ChampSelect') {
+                Utils.LCU.get('/lol-champ-select/v1/session').then(onChampSelectSession).catch(() => {});
+            } else {
+                removeWidget();
+            }
+        }).catch(() => {});
     }
 }
 
@@ -2252,6 +2280,7 @@ export function unload() {
     gameflowUnsub = null;
     _champSelectHookCleanup?.();
     _champSelectHookCleanup = null;
+    currentPhase = null;
     removeWidget();
     currentChampionId = 0;
     currentSession = null;
