@@ -1516,7 +1516,7 @@ const WelcomeModal = (function() {
         [
             t('Player lookup and match history tools'),
             t('Auto features for re-queue, auto accept, champion select, and honor'),
-            t('Champion select quality-of-life options, Dodge Button'),
+            t('Auto Rune & Spells'),
             t('Client window, profile, social panel, and mode selector tweaks'),
             t('Whales Helper loot and skin collection utilities'),
             t('And more...'),
@@ -1667,7 +1667,6 @@ const WelcomeModal = (function() {
 import * as autoAcceptModule from './modules/autoAccept.js';
 import * as aramNocdModule from './modules/aramNocd.js';
 import * as autoLockChampionModule from './modules/autoLockChampion.js';
-import * as champSelectQuitButtonModule from './modules/champSelectQuitButton.js';
 import * as SnoozeBalanceTooltipModule from './modules/SnoozeBalanceTooltip.js';
 import * as gameAnalysisPopupModule from './modules/gameAnalysisPopup.js';
 import * as customOnlineStatusModule from './modules/customOnlineStatus.js';
@@ -1688,7 +1687,6 @@ const MANAGED_MODULES = Object.freeze([
     ['autoAccept', autoAcceptModule],
     ['aramNocd', aramNocdModule],
     ['autoLockChampion', autoLockChampionModule],
-    ['champSelectQuitButton', champSelectQuitButtonModule],
     ['SnoozeBalanceTooltip', SnoozeBalanceTooltipModule],
     ['gameAnalysisPopup', gameAnalysisPopupModule],
     ['customOnlineStatus', customOnlineStatusModule],
@@ -1722,9 +1720,6 @@ const MODULE_INFO = {
     },
     autoLockChampion: {
         name: t('Auto Lock Champion')
-    },
-    champSelectQuitButton: {
-        name: t('Champ Select Quit Button')
     },
     SnoozeBalanceTooltip: {
         name: t('Mode Balance Info')
@@ -1987,10 +1982,6 @@ const LEGACY_MIGRATION_MAP = {
     'sm:betterFriendsStatusDebugEmber': {
         module: 'socialPanelTweaks',
         key: 'debugEmber'
-    },
-    'sm:champSelectQuitButton': {
-        module: 'champSelectQuitButton',
-        key: 'enabled'
     },
     'sm:customOnlineStatus': {
         module: 'customOnlineStatus',
