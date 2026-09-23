@@ -979,6 +979,10 @@ async function requestLCU(method, url, options = {}) {
     }
 }
 
+function uriToWampTopic(uri) {
+    return 'OnJsonApiEvent_' + uri.replace(/^\//, '').replace(/\//g, '_');
+}
+
 // LCU
 const LCU = {
     _ctx: null,
@@ -986,6 +990,10 @@ const LCU = {
     _uris: new Set(),
     _subscribed: new Set(),
     _subscriptions: new Map(),
+    _ownWs: null,
+    _reconnectTimer: null,
+    _lastDispatched: new Map(),
+    _lastDispatchedTime: new Map(),
 
     bind(ctx) {
         if (this._ctx && this._ctx !== ctx) {
@@ -996,10 +1004,19 @@ const LCU = {
         this._ctx = ctx;
         window.LCU = this;
         Debug.log('[LCU] bindContext');
+        this._ensureOwnSocket();
         this._uris.forEach(u => this._subscribe(u));
     },
 
     unbind() {
+        if (this._reconnectTimer) {
+            clearTimeout(this._reconnectTimer);
+            this._reconnectTimer = null;
+        }
+        if (this._ownWs) {
+            try { this._ownWs.close(); } catch (_) {}
+            this._ownWs = null;
+        }
         for (const uri of [...this._subscriptions.keys()]) {
             this._disconnectUri(uri);
         }
@@ -1007,8 +1024,88 @@ const LCU = {
         this._uris.clear();
         this._subscribed.clear();
         this._subscriptions.clear();
+        this._lastDispatched.clear();
+        this._lastDispatchedTime.clear();
         this._ctx = null;
         if (window.LCU === this) delete window.LCU;
+    },
+
+    _ensureOwnSocket() {
+        if (typeof WebSocket === 'undefined') return;
+        if (this._ownWs && (this._ownWs.readyState === WebSocket.CONNECTING || this._ownWs.readyState === WebSocket.OPEN)) return;
+
+        try {
+            const host = (typeof location !== 'undefined' && location.host) ? location.host : '127.0.0.1:26753';
+            const ws = new WebSocket(`wss://${host}/`, 'wamp');
+            this._ownWs = ws;
+
+            ws.onopen = () => {
+                Debug.log('[LCU] Resilient native WAMP socket connected');
+                this._resubscribeAll();
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const [type, , payload] = JSON.parse(event.data);
+                    if (type === 8 && payload && payload.uri) {
+                        this._dispatch(payload.uri, payload);
+                    }
+                } catch (e) {}
+            };
+
+            ws.onclose = () => {
+                this._ownWs = null;
+                this._scheduleReconnect();
+            };
+
+            ws.onerror = () => {
+                try { ws.close(); } catch (_) {}
+            };
+        } catch (err) {
+            this._scheduleReconnect();
+        }
+    },
+
+    _scheduleReconnect() {
+        if (this._reconnectTimer) return;
+        this._reconnectTimer = setTimeout(() => {
+            this._reconnectTimer = null;
+            this._ensureOwnSocket();
+        }, 1500);
+    },
+
+    _resubscribeAll() {
+        if (!this._ownWs || this._ownWs.readyState !== WebSocket.OPEN) return;
+        for (const uri of this._uris) {
+            try {
+                this._ownWs.send(JSON.stringify([5, uriToWampTopic(uri)]));
+            } catch (_) {}
+        }
+    },
+
+    _dispatch(uri, payload) {
+        const listeners = this._listeners.get(uri);
+        if (!listeners || listeners.size === 0) return;
+
+        // Deduplicate rapid dual-delivery from both native WAMP and Pengu ctx.socket
+        const dedupeKey = `${uri}:${typeof payload?.data === 'object' ? JSON.stringify(payload.data) : payload?.data}`;
+        const now = Date.now();
+        if (this._lastDispatched.get(uri) === dedupeKey && (now - (this._lastDispatchedTime.get(uri) || 0)) < 150) {
+            return;
+        }
+        this._lastDispatched.set(uri, dedupeKey);
+        this._lastDispatchedTime.set(uri, now);
+
+        for (const callback of listeners) {
+            try {
+                const result = callback(payload);
+                if (result && typeof result.catch === 'function') {
+                    result.catch(error => Debug.error(`[LCU] Observer callback rejected for ${uri}:`, error));
+                }
+            } catch (error) {
+                Debug.error(`[LCU] Observer callback failed for ${uri}:`, error);
+            }
+        }
     },
 
     async get(url) {
@@ -1056,6 +1153,14 @@ const LCU = {
         if (!this._listeners.has(uri)) this._listeners.set(uri, new Set());
         this._listeners.get(uri).add(cb);
         this._uris.add(uri);
+
+        this._ensureOwnSocket();
+        if (this._ownWs && this._ownWs.readyState === WebSocket.OPEN) {
+            try {
+                this._ownWs.send(JSON.stringify([5, uriToWampTopic(uri)]));
+            } catch (_) {}
+        }
+
         if (this._ctx?.socket) this._subscribe(uri);
         return () => {
             const listeners = this._listeners.get(uri);
@@ -1076,16 +1181,7 @@ const LCU = {
         const ctx = this._ctx;
         const listener = (data) => {
             if (this._ctx !== ctx) return;
-            for (const callback of this._listeners.get(uri) || []) {
-                try {
-                    const result = callback(data);
-                    if (result && typeof result.catch === 'function') {
-                        result.catch(error => Debug.error(`[LCU] Observer callback rejected for ${uri}:`, error));
-                    }
-                } catch (error) {
-                    Debug.error(`[LCU] Observer callback failed for ${uri}:`, error);
-                }
-            }
+            this._dispatch(uri, { uri, data, eventType: 'Update' });
         };
         let subscription;
         try {

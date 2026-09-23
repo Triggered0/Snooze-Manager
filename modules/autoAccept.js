@@ -159,11 +159,66 @@ export function init(context) {
     }
 }
 
+export function calculateEffectiveAcceptDelayMs(configuredDelaySeconds) {
+    const raw = Number(configuredDelaySeconds);
+    const validDelay = (!isFinite(raw) || raw < 0) ? 0 : raw;
+    // Safe minimum of 1.0s (1000ms) to ensure League client audio engine cleanly
+    // registers the ready-check before receiving the accept stop trigger, preventing audio loop bug.
+    return Math.max(Math.round(validDelay * 1000), 1000);
+}
+
 let _phaseUnsub = null;
 let _readyCheckUnsub = null;
 let _notificationsUnsub = null;
 let _hideReadyCheckHookCleanup = null;
 let _exitOnDodgeHookCleanup = null;
+let _watchdogTimer = null;
+
+function startWatchdog() {
+    if (_watchdogTimer) return;
+    _watchdogTimer = setInterval(async () => {
+        try {
+            const data = await Utils.LCU.get('/lol-matchmaking/v1/ready-check');
+            if (data && data.state === 'InProgress' && data.playerResponse === 'None') {
+                triggerAccept('Watchdog');
+            }
+        } catch (_) {}
+    }, 1000);
+}
+
+function stopWatchdog() {
+    if (_watchdogTimer) {
+        clearInterval(_watchdogTimer);
+        _watchdogTimer = null;
+    }
+}
+
+function triggerAccept(source = 'WS') {
+    if (!isEnabled) return;
+    if (acceptedCurrentReadyCheck) return;
+    acceptedCurrentReadyCheck = true;
+    wasInReadyCheck = true;
+
+    const delay = getDelay();
+    const safeDelayMs = calculateEffectiveAcceptDelayMs(delay);
+
+    cancelPendingAccept();
+    let isCancelled = false;
+    pendingPanicUnsub = Utils.Panic.register(() => {
+        isCancelled = true;
+        cancelPendingAccept();
+    });
+
+    Utils.Debug.log(`[AutoAccept] Accepting ready check in ${safeDelayMs}ms (source: ${source})...`);
+
+    pendingAcceptTimer = setTimeout(() => {
+        pendingAcceptTimer = null;
+        pendingPanicUnsub?.();
+        pendingPanicUnsub = null;
+        if (isCancelled || !isEnabled || !acceptedCurrentReadyCheck) return;
+        Utils.LCU.post('/lol-matchmaking/v1/ready-check/accept').catch(() => {});
+    }, safeDelayMs);
+}
 
 export function load() {
     if (Utils.LCU && Utils.LCU.observe) {
@@ -171,40 +226,22 @@ export function load() {
             const phase = e.data;
             const exitOnDecline = Utils.Store.get('autoAccept', EXIT_ON_DECLINE_KEY);
 
-            if (phase === 'ReadyCheck') {
-                wasInReadyCheck = true;
-                acceptedCurrentReadyCheck = false;
-                if (!isEnabled) return;
-                if (acceptedCurrentReadyCheck) return;
-                acceptedCurrentReadyCheck = true;
-
-                const delay = getDelay();
-                // Enforce a safe minimum delay of 1.0s (1000ms) to ensure League client audio
-                // engine cleanly registers the ready-check before receiving the accept stop trigger,
-                // preventing the known client bug where the match found sound loops indefinitely.
-                const safeDelayMs = Math.max(Math.round(delay * 1000), 1000);
-
+            if (phase === 'Matchmaking') {
+                startWatchdog();
                 cancelPendingAccept();
-                let isCancelled = false;
-                pendingPanicUnsub = Utils.Panic.register(() => {
-                    isCancelled = true;
-                    cancelPendingAccept();
-                });
-
-                pendingAcceptTimer = setTimeout(() => {
-                    pendingAcceptTimer = null;
-                    pendingPanicUnsub?.();
-                    pendingPanicUnsub = null;
-                    if (isCancelled || !isEnabled || !acceptedCurrentReadyCheck) return;
-                    Utils.LCU.post('/lol-matchmaking/v1/ready-check/accept').catch(() => {});
-                }, safeDelayMs);
+                wasInReadyCheck = false;
+                acceptedCurrentReadyCheck = false;
+            } else if (phase === 'ReadyCheck') {
+                triggerAccept('GameflowPhase');
             } else if (phase === 'Lobby' && wasInReadyCheck && exitOnDecline) {
+                stopWatchdog();
                 cancelPendingAccept();
                 wasInReadyCheck = false;
                 acceptedCurrentReadyCheck = false;
                 Utils.Debug.log('[AutoAccept] ReadyCheck ended without accepting (decline/timeout). Exiting queue...');
                 Utils.LCU.delete('/lol-lobby/v2/lobby/matchmaking/search').catch(() => {});
             } else {
+                stopWatchdog();
                 cancelPendingAccept();
                 wasInReadyCheck = false;
                 acceptedCurrentReadyCheck = false;
@@ -212,10 +249,26 @@ export function load() {
         });
 
         _readyCheckUnsub = Utils.LCU.observe('/lol-matchmaking/v1/ready-check', e => {
-            if (!e.data || !Utils.Store.get('autoAccept', EXIT_ON_DECLINE_KEY)) return;
-            if (e.data.state === 'StrangerNotReady' || e.data.state === 'PartyNotReady') {
-                Utils.Debug.log('[AutoAccept] Queue declined by someone. Exiting queue...');
-                Utils.LCU.delete('/lol-lobby/v2/lobby/matchmaking/search').catch(() => {});
+            if (!e.data) return;
+            const data = e.data;
+
+            if (data.state === 'InProgress') {
+                if (data.playerResponse === 'None') {
+                    triggerAccept('ReadyCheckEvent');
+                } else if (data.playerResponse === 'Accepted') {
+                    acceptedCurrentReadyCheck = true;
+                    cancelPendingAccept();
+                }
+            } else if (data.state === 'StrangerNotReady' || data.state === 'PartyNotReady') {
+                cancelPendingAccept();
+                acceptedCurrentReadyCheck = false;
+                wasInReadyCheck = false;
+                if (Utils.Store.get('autoAccept', EXIT_ON_DECLINE_KEY)) {
+                    Utils.Debug.log('[AutoAccept] Queue declined by someone. Exiting queue...');
+                    Utils.LCU.delete('/lol-lobby/v2/lobby/matchmaking/search').catch(() => {});
+                }
+            } else if (data.state === 'EveryoneReady') {
+                cancelPendingAccept();
             }
         });
 
@@ -274,6 +327,7 @@ function installExitOnDodgeEmberHook() {
     });
 }
 export function unload() {
+    stopWatchdog();
     cancelPendingAccept();
     acceptedCurrentReadyCheck = false;
     wasInReadyCheck = false;
