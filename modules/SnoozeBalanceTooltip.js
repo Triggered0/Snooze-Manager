@@ -50,7 +50,7 @@ const HOVER_COMPONENTS = [{
     }
 ];
 
-function getModeKey(gameMode) {
+export function getModeKey(gameMode) {
     const mode = (gameMode || '').toLowerCase();
     if (mode === 'nexusblitz' || mode === 'nb') return 'nb';
     if (mode === 'cherry' || mode === 'arena' || mode === 'ar') return 'ar';
@@ -237,8 +237,32 @@ function hideTT() {
     if (ttRoot && ttRoot.style.opacity !== '0') ttRoot.style.opacity = '0';
 }
 
+let _syncingModePromise = null;
+
+async function ensureModeAndData() {
+    if (Object.keys(balanceData).length === 0) {
+        await fetchWikiData();
+    }
+    if (!currentMode) {
+        if (!_syncingModePromise) {
+            _syncingModePromise = syncMode().finally(() => { _syncingModePromise = null; });
+        }
+        await _syncingModePromise;
+    }
+}
+
 function showBalanceTooltip(component, position) {
-    if (!isEnabled || !currentMode || Object.keys(balanceData).length === 0) {
+    if (!isEnabled) {
+        hideTT();
+        return;
+    }
+
+    if (!currentMode || Object.keys(balanceData).length === 0) {
+        ensureModeAndData().then(() => {
+            if (currentMode && Object.keys(balanceData).length > 0 && component?.element?.matches(':hover')) {
+                showBalanceTooltip(component, position);
+            }
+        }).catch(() => {});
         hideTT();
         return;
     }

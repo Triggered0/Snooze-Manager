@@ -475,7 +475,13 @@ const Toast = {
  * - Batches mutations using requestAnimationFrame
  */
 
-function createSmartObserver(root = document.documentElement) {
+function createSmartObserver(root = (typeof document !== 'undefined' ? document.documentElement : null)) {
+    if (typeof MutationObserver === 'undefined' || !root) {
+        return {
+            observe: () => () => {},
+            disconnect: () => {}
+        };
+    }
     const registry = new Map(); // selector -> Set<{ callback, seen }>
     let scheduled = false;
     let pendingNodes = new Set();
@@ -604,7 +610,8 @@ const observer = createSmartObserver();
  * Ember Hook
  */
 
-const EmberHook = window.__SM_EmberHook || (window.__SM_EmberHook = {
+const globalScope = typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : {});
+const EmberHook = globalScope.__SM_EmberHook || (globalScope.__SM_EmberHook = {
     _rules: [],
     _installed: false,
     _wrappedMark: Symbol('SnoozeEmberWrapped'),
@@ -652,7 +659,7 @@ const EmberHook = window.__SM_EmberHook || (window.__SM_EmberHook = {
     },
 
     _findEmberSync(emberLibs) {
-        if (window.Ember && typeof window.Ember.Component?.extend === 'function' &&
+        if (typeof window !== 'undefined' && window.Ember && typeof window.Ember.Component?.extend === 'function' &&
             typeof window.Ember.Service?.extend === 'function') {
             return window.Ember;
         }
@@ -2651,5 +2658,7 @@ export const Utils = {
         getSgpMatchHistory
     }
 };
-window.Utils = Utils;
+if (typeof window !== 'undefined') {
+    window.Utils = Utils;
+}
 export default Utils;

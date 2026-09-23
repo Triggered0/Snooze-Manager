@@ -361,6 +361,35 @@ async function computePremadeGroups(teamPlayers) {
     return premadeMap;
 }
 
+export function findPlayerInSession(session, idInfo) {
+    if (!session || !idInfo) return null;
+    let list = session.myTeam;
+    if (!Array.isArray(list) || list.length === 0) {
+        list = session.gameData?.teamOne || session.gameData?.teamTwo || [];
+    }
+    if (!Array.isArray(list) || list.length === 0) return null;
+
+    const targetValStr = String(idInfo.value);
+    const targetValNum = Number(idInfo.value);
+
+    return list.find((m, idx) => {
+        if (!m) return false;
+        if (idInfo.type === 'summonerId' && m.summonerId != null) {
+            return String(m.summonerId) === targetValStr;
+        }
+        if (idInfo.type === 'cellId' && m.cellId != null) {
+            if (String(m.cellId) === targetValStr || Number(m.cellId) === targetValNum) return true;
+        }
+        if (idInfo.type === 'puuid' && m.puuid) {
+            return String(m.puuid).toLowerCase() === targetValStr.toLowerCase();
+        }
+        if (idInfo.type === 'cellId' && !isNaN(targetValNum)) {
+            if (targetValNum === idx || (targetValNum % 5) === idx) return true;
+        }
+        return false;
+    }) || null;
+}
+
 let currentChampSelectSessionId = null;
 let champSelectPremadeMap = new Map();
 let computingPremades = null;
@@ -616,9 +645,11 @@ async function analyzePlayer(p, currentTag, premadeColor) {
     `;
 }
 
-const showGameAnalysis = async () => {
+export const showGameAnalysis = async () => {
     if (!isEnabled) return;
     Utils.Debug.log('[GameAnalysis] showGameAnalysis started');
+    window._pmShowAnalysis = showGameAnalysis;
+    if (window.SnoozeManager) window.SnoozeManager.showAnalysis = showGameAnalysis;
 
     // Invalidate cached gameflow session to ensure a fresh fetch
     _cachedGfSessionPromise = null;
@@ -731,6 +762,8 @@ function clearLobbyCache() {
     currentChampSelectSessionId = null;
     champSelectPremadeMap = new Map();
     computingPremades = null;
+    _wsCsSession = null;
+    _wsGfSession = null;
     lobbyGeneration++;
     Utils.Debug.log(`[GameAnalysis] Lobby cache cleared. lobbyGeneration=${lobbyGeneration}`);
 }
@@ -1217,12 +1250,7 @@ export function init(context) {
                                 return;
                             }
 
-                            const player = session.myTeam.find(m => {
-                                if (activeIdInfo.type === 'summonerId') return m.summonerId === activeIdInfo.value;
-                                if (activeIdInfo.type === 'cellId') return m.cellId === activeIdInfo.value;
-                                if (activeIdInfo.type === 'puuid') return m.puuid === activeIdInfo.value;
-                                return false;
-                            });
+                            const player = findPlayerInSession(session, activeIdInfo);
 
                             if (player) {
                                 Utils.Debug.log(`[GameAnalysis] Match found in session: ${player.gameName || 'Anonymous'}#${player.tagLine || '????'}`);
@@ -1332,13 +1360,7 @@ export function init(context) {
                             return;
                         }
 
-                        Utils.Debug.log(`[GameAnalysis] Finding player matching ${trackingKey} inside team lists...`);
-                        const player = session.myTeam.find(m => {
-                            if (idInfo.type === 'summonerId') return m.summonerId === idInfo.value;
-                            if (idInfo.type === 'cellId') return m.cellId === idInfo.value;
-                            if (idInfo.type === 'puuid') return m.puuid === idInfo.value;
-                            return false;
-                        });
+                        const player = findPlayerInSession(session, idInfo);
 
                         if (!player) {
                             Utils.Debug.warn(`[GameAnalysis] Matching player not found in team array for mapping key: ${trackingKey}`);
