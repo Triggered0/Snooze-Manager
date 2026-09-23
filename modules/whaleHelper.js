@@ -671,6 +671,7 @@ async function fetchUnownedSkins() {
 }
 
 async function fetchUnownedIcons() {
+    await Utils.GameData.Assets.initHeavyAssets().catch(() => {});
     const {
         commonBase
     } = await Utils.GameData.getSgpContext();
@@ -706,6 +707,7 @@ async function fetchUnownedIcons() {
 }
 
 async function fetchUnownedWards() {
+    await Utils.GameData.Assets.initHeavyAssets().catch(() => {});
     const {
         commonBase
     } = await Utils.GameData.getSgpContext();
@@ -2382,7 +2384,7 @@ function renderSkinBlacklistUI(container) {
     let expandedSkins = new Set(); // Set of skin IDs whose chromas are expanded
 
     async function loadAndRender() {
-        // Assets.skins is already populated by init(); just use it directly
+        await Utils.GameData.Assets.initHeavyAssets().catch(() => {});
         const champMap = buildChampMapFromCache();
 
         // Champion names come from Assets cache if available, otherwise fetch once
@@ -2973,7 +2975,11 @@ export async function load() {
     await Utils.GameData.Assets.init().catch(() => {});
     await populateEmoteCache().catch(() => {});
     loadSkinBlacklist();
-    if (isSkinTierEnabled) mountSessionObserver();
+    if (isSkinTierEnabled) {
+        mountSessionObserver();
+        // Warm up heavy assets lazily in background without blocking startup
+        setTimeout(() => Utils.GameData.Assets.initHeavyAssets().catch(() => {}), 3000);
+    }
     installContextMenuInterceptors();
     installClickCapture();
     Utils.Debug.log('[WhaleHelper] Module loaded.');

@@ -68,6 +68,10 @@ function renderExtraSettings(container, native = false) {
         Utils.Store.set('autoAccept', DELAY_KEY, v);
     }));
 
+    container.appendChild(Utils.Settings.createInfoBox(
+        t('Note: A minimum safe delay of 1.0s is automatically enforced to prevent the League client audio engine from bugging into an infinite match-found sound loop.')
+    ));
+
     // Exit on Decline Toggle
     const exitEnabled = Utils.Store.get('autoAccept', EXIT_ON_DECLINE_KEY) || false;
     container.appendChild(Utils.Settings.createToggleRow(t('Exit queue if someone declines'), exitEnabled, (next) => {
@@ -111,7 +115,7 @@ export function init(context) {
     isEnabled = Utils.Store.get('autoAccept', SETTINGS_KEY) || false;
 
     if (Utils.Store.get('autoAccept', DELAY_KEY) === undefined) {
-        Utils.Store.set('autoAccept', DELAY_KEY, 0);
+        Utils.Store.set('autoAccept', DELAY_KEY, 2);
     }
 
     installExitOnDodgeEmberHook();
@@ -175,24 +179,25 @@ export function load() {
                 acceptedCurrentReadyCheck = true;
 
                 const delay = getDelay();
-                if (delay <= 0) {
-                    Utils.LCU.post('/lol-matchmaking/v1/ready-check/accept').catch(() => {});
-                } else {
-                    cancelPendingAccept();
-                    let isCancelled = false;
-                    pendingPanicUnsub = Utils.Panic.register(() => {
-                        isCancelled = true;
-                        cancelPendingAccept();
-                    });
+                // Enforce a safe minimum delay of 1.0s (1000ms) to ensure League client audio
+                // engine cleanly registers the ready-check before receiving the accept stop trigger,
+                // preventing the known client bug where the match found sound loops indefinitely.
+                const safeDelayMs = Math.max(Math.round(delay * 1000), 1000);
 
-                    pendingAcceptTimer = setTimeout(() => {
-                        pendingAcceptTimer = null;
-                        pendingPanicUnsub?.();
-                        pendingPanicUnsub = null;
-                        if (isCancelled || !isEnabled || !acceptedCurrentReadyCheck) return;
-                        Utils.LCU.post('/lol-matchmaking/v1/ready-check/accept').catch(() => {});
-                    }, delay * 1000);
-                }
+                cancelPendingAccept();
+                let isCancelled = false;
+                pendingPanicUnsub = Utils.Panic.register(() => {
+                    isCancelled = true;
+                    cancelPendingAccept();
+                });
+
+                pendingAcceptTimer = setTimeout(() => {
+                    pendingAcceptTimer = null;
+                    pendingPanicUnsub?.();
+                    pendingPanicUnsub = null;
+                    if (isCancelled || !isEnabled || !acceptedCurrentReadyCheck) return;
+                    Utils.LCU.post('/lol-matchmaking/v1/ready-check/accept').catch(() => {});
+                }, safeDelayMs);
             } else if (phase === 'Lobby' && wasInReadyCheck && exitOnDecline) {
                 cancelPendingAccept();
                 wasInReadyCheck = false;

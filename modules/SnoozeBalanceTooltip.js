@@ -7,13 +7,20 @@
  */
 import Utils, { t } from './generalUtils.js';
 
+const WIKI_CACHE_KEY = 'wikiBalanceCache';
+const WIKI_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
 let isEnabled = false;
 
 function toggleFeature(enabled) {
     isEnabled = enabled;
     Utils.Store.set('SnoozeBalanceTooltip', 'enabled', enabled);
-    if (enabled) mountSnoozeBalanceTooltip();
-    else unmountSnoozeBalanceTooltip();
+    if (enabled) {
+        if (Object.keys(balanceData).length === 0) fetchWikiData();
+        mountSnoozeBalanceTooltip();
+    } else {
+        unmountSnoozeBalanceTooltip();
+    }
 }
 
 let currentMode = null;
@@ -284,8 +291,20 @@ function parseStatsBlock(content) {
     return stats;
 }
 
-async function fetchWikiData() {
+async function fetchWikiData(force = false) {
     try {
+        if (!force) {
+            const cached = Utils.Store.get('SnoozeBalanceTooltip', WIKI_CACHE_KEY);
+            if (cached?.timestamp && cached?.data && Object.keys(cached.data).length > 0) {
+                const age = Date.now() - cached.timestamp;
+                if (age < WIKI_CACHE_TTL_MS) {
+                    balanceData = cached.data;
+                    Utils.Debug.log('[Snooze-Balance] Loaded Wiki data from cache for', Object.keys(balanceData).length, 'champions.');
+                    return;
+                }
+            }
+        }
+
         Utils.Debug.log('[Snooze-Balance] Fetching real-time Lua data from League Wiki...');
         const res = await fetch('https://wiki.leagueoflegends.com/en-us/Module:ChampionData/data?action=raw');
         if (!res.ok) throw new Error('Wiki fetch failed');
@@ -343,10 +362,19 @@ async function fetchWikiData() {
         }
         if (Object.keys(data).length > 0) {
             balanceData = data;
-            Utils.Debug.log('[Snooze-Balance] Successfully parsed Wiki data for', Object.keys(data).length, 'champions.');
+            Utils.Store.set('SnoozeBalanceTooltip', WIKI_CACHE_KEY, {
+                timestamp: Date.now(),
+                data
+            });
+            Utils.Debug.log('[Snooze-Balance] Successfully parsed and cached Wiki data for', Object.keys(data).length, 'champions.');
         }
     } catch (e) {
         Utils.Debug.error('[Snooze-Balance] Wiki processing failed:', e);
+        const fallback = Utils.Store.get('SnoozeBalanceTooltip', WIKI_CACHE_KEY);
+        if (fallback?.data && Object.keys(balanceData).length === 0) {
+            balanceData = fallback.data;
+            Utils.Debug.log('[Snooze-Balance] Fallback to cached Wiki data for', Object.keys(balanceData).length, 'champions.');
+        }
     }
 }
 
@@ -458,8 +486,10 @@ export function init(context) {
 }
 
 export function load() {
-    fetchWikiData();
-    if (isEnabled) mountSnoozeBalanceTooltip();
+    if (isEnabled) {
+        fetchWikiData();
+        mountSnoozeBalanceTooltip();
+    }
 }
 export function unload() {
     unmountSnoozeBalanceTooltip();
