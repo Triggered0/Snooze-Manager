@@ -170,8 +170,10 @@ let _hideReadyCheckHookCleanup = null;
 let _exitOnDodgeHookCleanup = null;
 let _watchdogTimer = null;
 let _activeReadyCheckComponent = null;
+let _currentPhase = null;
 
-export function stopReadyCheckAudio() {
+export function stopReadyCheckAudio(force = false) {
+    if (!force && _currentPhase === 'ReadyCheck') return;
     if (!_activeReadyCheckComponent) return;
     try {
         _activeReadyCheckComponent.fadeOutIdleSounds?.();
@@ -257,8 +259,6 @@ function triggerAccept(source = 'WS') {
         pendingPanicUnsub = null;
         Utils.Debug.log(`[AutoAccept] Accepting ready check instantly (0ms delay, source: ${source})...`);
         Utils.LCU.post('/lol-matchmaking/v1/ready-check/accept').catch(() => {});
-        setTimeout(stopReadyCheckAudio, 400);
-        setTimeout(stopReadyCheckAudio, 1200);
         return;
     }
 
@@ -270,8 +270,6 @@ function triggerAccept(source = 'WS') {
         pendingPanicUnsub = null;
         if (isCancelled || !isEnabled || !acceptedCurrentReadyCheck) return;
         Utils.LCU.post('/lol-matchmaking/v1/ready-check/accept').catch(() => {});
-        setTimeout(stopReadyCheckAudio, 400);
-        setTimeout(stopReadyCheckAudio, 1200);
     }, safeDelayMs);
 }
 
@@ -279,6 +277,7 @@ export function load() {
     if (Utils.LCU && Utils.LCU.observe) {
         _phaseUnsub = Utils.LCU.observe('/lol-gameflow/v1/gameflow-phase', e => {
             const phase = e.data;
+            _currentPhase = phase;
             const exitOnDecline = Utils.Store.get('autoAccept', EXIT_ON_DECLINE_KEY);
 
             if (phase === 'Matchmaking') {
@@ -286,7 +285,7 @@ export function load() {
                 cancelPendingAccept();
                 wasInReadyCheck = false;
                 acceptedCurrentReadyCheck = false;
-                stopReadyCheckAudio();
+                stopReadyCheckAudio(true);
             } else if (phase === 'ReadyCheck') {
                 triggerAccept('GameflowPhase');
             } else if (phase === 'ChampSelect' || phase === 'InProgress') {
@@ -294,16 +293,16 @@ export function load() {
                 cancelPendingAccept();
                 wasInReadyCheck = false;
                 acceptedCurrentReadyCheck = false;
-                stopReadyCheckAudio();
-                setTimeout(stopReadyCheckAudio, 300);
-                setTimeout(stopReadyCheckAudio, 1000);
+                stopReadyCheckAudio(true);
+                setTimeout(() => stopReadyCheckAudio(true), 300);
+                setTimeout(() => stopReadyCheckAudio(true), 1000);
             } else if (phase === 'Lobby') {
                 stopWatchdog();
                 cancelPendingAccept();
                 const wasReady = wasInReadyCheck;
                 wasInReadyCheck = false;
                 acceptedCurrentReadyCheck = false;
-                stopReadyCheckAudio();
+                stopReadyCheckAudio(true);
                 if (wasReady && exitOnDecline) {
                     Utils.Debug.log('[AutoAccept] ReadyCheck ended without accepting (decline/timeout). Exiting queue...');
                     Utils.LCU.delete('/lol-lobby/v2/lobby/matchmaking/search').catch(() => {});
@@ -313,7 +312,7 @@ export function load() {
                 cancelPendingAccept();
                 wasInReadyCheck = false;
                 acceptedCurrentReadyCheck = false;
-                stopReadyCheckAudio();
+                stopReadyCheckAudio(true);
             }
         });
 
@@ -394,7 +393,8 @@ function installExitOnDodgeEmberHook() {
 export function unload() {
     stopWatchdog();
     cancelPendingAccept();
-    stopReadyCheckAudio();
+    stopReadyCheckAudio(true);
+    _currentPhase = null;
     acceptedCurrentReadyCheck = false;
     wasInReadyCheck = false;
     _phaseUnsub?.();
