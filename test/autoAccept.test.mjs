@@ -4,8 +4,7 @@ import assert from 'node:assert/strict';
 export function calculateEffectiveAcceptDelayMs(configuredDelaySeconds) {
     const raw = Number(configuredDelaySeconds);
     const validDelay = (!isFinite(raw) || raw < 0) ? 0 : raw;
-    // Safe minimum of 1000ms to avoid League client audio engine infinite loop bug
-    return Math.max(Math.round(validDelay * 1000), 1000);
+    return Math.round(validDelay * 1000);
 }
 
 export class AutoAcceptStateMachine {
@@ -38,6 +37,13 @@ export class AutoAcceptStateMachine {
 
         const safeDelayMs = calculateEffectiveAcceptDelayMs(this.getDelay());
         this.cancelPendingAccept();
+
+        if (safeDelayMs === 0) {
+            this.pendingAcceptTimer = null;
+            this.acceptCalls++;
+            this.postAccept();
+            return;
+        }
 
         this.pendingAcceptTimer = setTimeout(() => {
             this.pendingAcceptTimer = null;
@@ -101,22 +107,38 @@ export class AutoAcceptStateMachine {
     }
 }
 
-test('calculateEffectiveAcceptDelayMs enforces 1000ms minimum even if configured with 0s', () => {
-    assert.equal(calculateEffectiveAcceptDelayMs(0), 1000);
-    assert.equal(calculateEffectiveAcceptDelayMs(0.5), 1000);
+test('calculateEffectiveAcceptDelayMs supports 0s and correctly converts seconds to ms', () => {
+    assert.equal(calculateEffectiveAcceptDelayMs(0), 0);
+    assert.equal(calculateEffectiveAcceptDelayMs(0.5), 500);
     assert.equal(calculateEffectiveAcceptDelayMs(1), 1000);
     assert.equal(calculateEffectiveAcceptDelayMs(1.5), 1500);
     assert.equal(calculateEffectiveAcceptDelayMs(2), 2000);
-    assert.equal(calculateEffectiveAcceptDelayMs(null), 1000);
-    assert.equal(calculateEffectiveAcceptDelayMs(undefined), 1000);
+    assert.equal(calculateEffectiveAcceptDelayMs(null), 0);
+    assert.equal(calculateEffectiveAcceptDelayMs(undefined), 0);
 });
 
-test('AutoAcceptStateMachine accepts on ReadyCheck and deduplicates duplicate ticks', async () => {
+test('AutoAcceptStateMachine accepts instantly with 0s delay', () => {
     let acceptCount = 0;
     const sm = new AutoAcceptStateMachine({
         postAccept: () => { acceptCount++; },
         exitQueue: () => {},
-        getDelay: () => 0, // minimum 1000ms enforced
+        getDelay: () => 0,
+        isEnabled: () => true
+    });
+
+    sm.handleGameflowPhase('Matchmaking');
+    sm.handleReadyCheck({ state: 'InProgress', playerResponse: 'None' });
+    assert.equal(sm.acceptedCurrentReadyCheck, true);
+    assert.equal(sm.acceptCalls, 1, 'Should call postAccept immediately on 0s delay');
+    assert.equal(sm.pendingAcceptTimer, null, 'No pending timer needed for 0s delay');
+});
+
+test('AutoAcceptStateMachine accepts on ReadyCheck and deduplicates duplicate ticks with delay', async () => {
+    let acceptCount = 0;
+    const sm = new AutoAcceptStateMachine({
+        postAccept: () => { acceptCount++; },
+        exitQueue: () => {},
+        getDelay: () => 1,
         isEnabled: () => true
     });
 
@@ -140,7 +162,7 @@ test('AutoAcceptStateMachine cleanly resets on decline and accepts subsequent po
     const sm = new AutoAcceptStateMachine({
         postAccept: () => { acceptCount++; },
         exitQueue: () => { exitCount++; },
-        getDelay: () => 0,
+        getDelay: () => 1,
         isEnabled: () => true
     });
 
@@ -165,7 +187,7 @@ test('AutoAcceptStateMachine watchdog catches ReadyCheck if socket dropped durin
     const sm = new AutoAcceptStateMachine({
         postAccept: () => { acceptCount++; },
         exitQueue: () => {},
-        getDelay: () => 0,
+        getDelay: () => 1,
         isEnabled: () => true
     });
 

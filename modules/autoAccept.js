@@ -68,10 +68,6 @@ function renderExtraSettings(container, native = false) {
         Utils.Store.set('autoAccept', DELAY_KEY, v);
     }));
 
-    container.appendChild(Utils.Settings.createInfoBox(
-        t('Note: A minimum safe delay of 1.0s is automatically enforced to prevent the League client audio engine from bugging into an infinite match-found sound loop.')
-    ));
-
     // Exit on Decline Toggle
     const exitEnabled = Utils.Store.get('autoAccept', EXIT_ON_DECLINE_KEY) || false;
     container.appendChild(Utils.Settings.createToggleRow(t('Exit queue if someone declines'), exitEnabled, (next) => {
@@ -115,9 +111,10 @@ export function init(context) {
     isEnabled = Utils.Store.get('autoAccept', SETTINGS_KEY) || false;
 
     if (Utils.Store.get('autoAccept', DELAY_KEY) === undefined) {
-        Utils.Store.set('autoAccept', DELAY_KEY, 2);
+        Utils.Store.set('autoAccept', DELAY_KEY, 0);
     }
 
+    installReadyCheckAudioHook();
     installExitOnDodgeEmberHook();
     installHideReadyCheckEmberHook();
 
@@ -162,17 +159,62 @@ export function init(context) {
 export function calculateEffectiveAcceptDelayMs(configuredDelaySeconds) {
     const raw = Number(configuredDelaySeconds);
     const validDelay = (!isFinite(raw) || raw < 0) ? 0 : raw;
-    // Safe minimum of 1.0s (1000ms) to ensure League client audio engine cleanly
-    // registers the ready-check before receiving the accept stop trigger, preventing audio loop bug.
-    return Math.max(Math.round(validDelay * 1000), 1000);
+    return Math.round(validDelay * 1000);
 }
 
 let _phaseUnsub = null;
 let _readyCheckUnsub = null;
 let _notificationsUnsub = null;
+let _readyCheckAudioHookCleanup = null;
 let _hideReadyCheckHookCleanup = null;
 let _exitOnDodgeHookCleanup = null;
 let _watchdogTimer = null;
+let _activeReadyCheckComponent = null;
+
+export function stopReadyCheckAudio() {
+    if (!_activeReadyCheckComponent) return;
+    try {
+        _activeReadyCheckComponent.fadeOutIdleSounds?.();
+        const loopSound = _activeReadyCheckComponent.get?.('timerAcceptLoopSound');
+        if (loopSound?.stop) loopSound.stop();
+        const matchSound = _activeReadyCheckComponent.get?.('matchFoundSound');
+        if (matchSound?.stop) matchSound.stop();
+        const countdownSound = _activeReadyCheckComponent.get?.('timerCountdownSound');
+        if (countdownSound?.stop) countdownSound.stop();
+    } catch (_) {}
+}
+
+function installReadyCheckAudioHook() {
+    if (!Utils.Hooks?.Ember?.registerRule) return;
+    _readyCheckAudioHookCleanup = Utils.Hooks.Ember.registerRule({
+        name: 'autoAccept-readyCheckAudio',
+        matcher: 'ready-check-root-element',
+        hookMethods: [
+            {
+                name: 'didInsertElement',
+                callback(Ember, original, ...args) {
+                    original(...args);
+                    _activeReadyCheckComponent = this;
+                }
+            },
+            {
+                name: 'willDestroyElement',
+                callback(Ember, original, ...args) {
+                    try {
+                        this.fadeOutIdleSounds?.();
+                        this.get?.('timerAcceptLoopSound')?.stop?.();
+                        this.get?.('matchFoundSound')?.stop?.();
+                        this.get?.('timerCountdownSound')?.stop?.();
+                    } catch (_) {}
+                    if (_activeReadyCheckComponent === this) {
+                        _activeReadyCheckComponent = null;
+                    }
+                    original(...args);
+                }
+            }
+        ]
+    });
+}
 
 function startWatchdog() {
     if (_watchdogTimer) return;
@@ -209,6 +251,17 @@ function triggerAccept(source = 'WS') {
         cancelPendingAccept();
     });
 
+    if (safeDelayMs === 0) {
+        pendingAcceptTimer = null;
+        pendingPanicUnsub?.();
+        pendingPanicUnsub = null;
+        Utils.Debug.log(`[AutoAccept] Accepting ready check instantly (0ms delay, source: ${source})...`);
+        Utils.LCU.post('/lol-matchmaking/v1/ready-check/accept').catch(() => {});
+        setTimeout(stopReadyCheckAudio, 400);
+        setTimeout(stopReadyCheckAudio, 1200);
+        return;
+    }
+
     Utils.Debug.log(`[AutoAccept] Accepting ready check in ${safeDelayMs}ms (source: ${source})...`);
 
     pendingAcceptTimer = setTimeout(() => {
@@ -217,6 +270,8 @@ function triggerAccept(source = 'WS') {
         pendingPanicUnsub = null;
         if (isCancelled || !isEnabled || !acceptedCurrentReadyCheck) return;
         Utils.LCU.post('/lol-matchmaking/v1/ready-check/accept').catch(() => {});
+        setTimeout(stopReadyCheckAudio, 400);
+        setTimeout(stopReadyCheckAudio, 1200);
     }, safeDelayMs);
 }
 
@@ -231,20 +286,34 @@ export function load() {
                 cancelPendingAccept();
                 wasInReadyCheck = false;
                 acceptedCurrentReadyCheck = false;
+                stopReadyCheckAudio();
             } else if (phase === 'ReadyCheck') {
                 triggerAccept('GameflowPhase');
-            } else if (phase === 'Lobby' && wasInReadyCheck && exitOnDecline) {
+            } else if (phase === 'ChampSelect' || phase === 'InProgress') {
                 stopWatchdog();
                 cancelPendingAccept();
                 wasInReadyCheck = false;
                 acceptedCurrentReadyCheck = false;
-                Utils.Debug.log('[AutoAccept] ReadyCheck ended without accepting (decline/timeout). Exiting queue...');
-                Utils.LCU.delete('/lol-lobby/v2/lobby/matchmaking/search').catch(() => {});
+                stopReadyCheckAudio();
+                setTimeout(stopReadyCheckAudio, 300);
+                setTimeout(stopReadyCheckAudio, 1000);
+            } else if (phase === 'Lobby') {
+                stopWatchdog();
+                cancelPendingAccept();
+                const wasReady = wasInReadyCheck;
+                wasInReadyCheck = false;
+                acceptedCurrentReadyCheck = false;
+                stopReadyCheckAudio();
+                if (wasReady && exitOnDecline) {
+                    Utils.Debug.log('[AutoAccept] ReadyCheck ended without accepting (decline/timeout). Exiting queue...');
+                    Utils.LCU.delete('/lol-lobby/v2/lobby/matchmaking/search').catch(() => {});
+                }
             } else {
                 stopWatchdog();
                 cancelPendingAccept();
                 wasInReadyCheck = false;
                 acceptedCurrentReadyCheck = false;
+                stopReadyCheckAudio();
             }
         });
 
@@ -294,17 +363,13 @@ function installHideReadyCheckEmberHook() {
         hookMethods: [{
             name: 'didInsertElement',
             callback(Ember, original, ...args) {
+                original(...args);
                 const enabled = Utils.Store.get('autoAccept', SETTINGS_KEY) && Utils.Store.get('autoAccept', HIDE_READY_CHECK_KEY);
-                if (!enabled) {
-                    original(...args);
-                    return;
-                }
-                this._super(...arguments);
-                this.registerStateMachineElement();
-                this.setUpAudioListeners();
+                if (!enabled) return;
                 const e = this.element?.parentElement?.parentElement;
-                if (e && e.parentElement) {
-                    e.parentElement.removeChild(e);
+                if (e) {
+                    e.style.opacity = '0';
+                    e.style.pointerEvents = 'none';
                 }
             }
         }]
@@ -329,6 +394,7 @@ function installExitOnDodgeEmberHook() {
 export function unload() {
     stopWatchdog();
     cancelPendingAccept();
+    stopReadyCheckAudio();
     acceptedCurrentReadyCheck = false;
     wasInReadyCheck = false;
     _phaseUnsub?.();
@@ -337,6 +403,9 @@ export function unload() {
     _readyCheckUnsub = null;
     _notificationsUnsub?.();
     _notificationsUnsub = null;
+    _readyCheckAudioHookCleanup?.();
+    _readyCheckAudioHookCleanup = null;
+    _activeReadyCheckComponent = null;
     _hideReadyCheckHookCleanup?.();
     _hideReadyCheckHookCleanup = null;
     _exitOnDodgeHookCleanup?.();
